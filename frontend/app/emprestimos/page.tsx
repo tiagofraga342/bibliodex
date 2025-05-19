@@ -1,6 +1,6 @@
 "use client";
 import * as React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface Emprestimo {
   id: number;
@@ -11,49 +11,11 @@ interface Emprestimo {
   status: "Em andamento" | "Devolvido";
 }
 
-const MOCK_EMPRESTIMOS: Emprestimo[] = [
-  {
-    id: 1,
-    livro: { id: 1, titulo: "Estruturas de Dados", autor: "N. Wirth", categoria: "Tecnologia" },
-    usuario: { id: 1, nome: "João Silva", tipo: "aluno" },
-    dataEmprestimo: "2024-05-01",
-    dataDevolucao: null,
-    status: "Em andamento",
-  },
-  {
-    id: 2,
-    livro: { id: 2, titulo: "Banco de Dados", autor: "Elmasri", categoria: "Tecnologia" },
-    usuario: { id: 2, nome: "Maria Souza", tipo: "funcionario" },
-    dataEmprestimo: "2024-04-20",
-    dataDevolucao: "2024-04-27",
-    status: "Devolvido",
-  },
-  {
-    id: 3,
-    livro: { id: 3, titulo: "Algoritmos", autor: "Cormen", categoria: "Tecnologia" },
-    usuario: { id: 1, nome: "João Silva", tipo: "aluno" },
-    dataEmprestimo: "2024-04-10",
-    dataDevolucao: "2024-04-17",
-    status: "Devolvido",
-  },
-];
-
-const usuarios = [
-  { id: 1, nome: "João Silva", tipo: "aluno" },
-  { id: 2, nome: "Maria Souza", tipo: "funcionario" },
-];
-
-const livros = [
-  { id: 1, titulo: "Estruturas de Dados" },
-  { id: 2, titulo: "Banco de Dados" },
-  { id: 3, titulo: "Algoritmos" },
-];
-
 export default function PainelEmprestimos() {
   const [filtroUsuario, setFiltroUsuario] = useState("");
   const [filtroLivro, setFiltroLivro] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("");
-  const [emprestimos, setEmprestimos] = useState<Emprestimo[]>(MOCK_EMPRESTIMOS);
+  const [emprestimos, setEmprestimos] = useState<Emprestimo[]>([]);
   const [modalDetalhes, setModalDetalhes] = useState<Emprestimo | null>(null);
 
   // Estados e refs para dropdowns
@@ -158,6 +120,31 @@ export default function PainelEmprestimos() {
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [emprestimosRes, usuariosRes, livrosRes] = await Promise.all([
+          fetch('/api/emprestimos'),
+          fetch('/api/usuarios'),
+          fetch('/api/livros')
+        ]);
+
+        const [emprestimosData, usuariosData, livrosData] = await Promise.all([
+          emprestimosRes.json(),
+          usuariosRes.json(),
+          livrosRes.json()
+        ]);
+
+        setEmprestimos(emprestimosData);
+        // Atualizar estados de usuários e livros se necessário
+      } catch (error) {
+        console.error('Erro ao buscar dados:', error);
+      }
+    }
+
+    fetchData();
   }, []);
 
   function filtrarEmprestimos() {

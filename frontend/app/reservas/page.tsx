@@ -1,6 +1,6 @@
 "use client";
 import * as React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface Reserva {
   id: number;
@@ -10,43 +10,10 @@ interface Reserva {
   status: "Ativa" | "Cancelada" | "Efetivada";
 }
 
-const MOCK_RESERVAS: Reserva[] = [
-  {
-    id: 1,
-    livro: { id: 1, titulo: "Estruturas de Dados", autor: "N. Wirth", categoria: "Tecnologia" },
-    usuario: { id: 1, nome: "João Silva", tipo: "aluno" },
-    dataReserva: "2024-05-10",
-    status: "Ativa",
-  },
-  {
-    id: 2,
-    livro: { id: 2, titulo: "Banco de Dados", autor: "Elmasri", categoria: "Tecnologia" },
-    usuario: { id: 2, nome: "Maria Souza", tipo: "funcionario" },
-    dataReserva: "2024-05-05",
-    status: "Efetivada",
-  },
-  {
-    id: 3,
-    livro: { id: 3, titulo: "Algoritmos", autor: "Cormen", categoria: "Tecnologia" },
-    usuario: { id: 1, nome: "João Silva", tipo: "aluno" },
-    dataReserva: "2024-04-28",
-    status: "Cancelada",
-  },
-];
-
-const usuarios = [
-  { id: 1, nome: "João Silva", tipo: "aluno" },
-  { id: 2, nome: "Maria Souza", tipo: "funcionario" },
-];
-
-const livros = [
-  { id: 1, titulo: "Estruturas de Dados" },
-  { id: 2, titulo: "Banco de Dados" },
-  { id: 3, titulo: "Algoritmos" },
-];
-
 export default function Reservas() {
-  const [reservas, setReservas] = useState<Reserva[]>(MOCK_RESERVAS);
+  const [reservas, setReservas] = useState<Reserva[]>([]);
+  const [usuarios, setUsuarios] = useState<{ id: number; nome: string; tipo: string }[]>([]);
+  const [livros, setLivros] = useState<{ id: number; titulo: string; autor: string }[]>([]);
   const [filtroUsuario, setFiltroUsuario] = useState("");
   const [filtroLivro, setFiltroLivro] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("");
@@ -172,6 +139,29 @@ export default function Reservas() {
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [reservasRes, usuariosRes, livrosRes] = await Promise.all([
+          fetch("/api/reservas"),
+          fetch("/api/usuarios"),
+          fetch("/api/livros"),
+        ]);
+        const [reservasData, usuariosData, livrosData] = await Promise.all([
+          reservasRes.json(),
+          usuariosRes.json(),
+          livrosRes.json(),
+        ]);
+        setReservas(reservasData);
+        setUsuarios(usuariosData);
+        setLivros(livrosData);
+      } catch (error) {
+        console.error("Erro ao buscar dados:", error);
+      }
+    }
+    fetchData();
   }, []);
 
   function filtrarReservas() {

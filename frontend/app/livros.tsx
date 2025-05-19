@@ -22,27 +22,6 @@ interface Usuario {
   tipo: string;
 }
 
-// Simula busca de usuários por nome (mock, substitua por chamada real ao backend futuramente)
-async function buscarUsuariosPorNome(nome: string): Promise<Usuario[]> {
-  // Aqui você faria uma chamada à API, ex: api.get(`/usuarios?nome=${nome}`)
-  // Mock simples para demonstração:
-  const todos = [
-    { id: 1, nome: "João Silva", tipo: "aluno" },
-    { id: 2, nome: "Maria Souza", tipo: "funcionario" },
-    { id: 3, nome: "Carlos Lima", tipo: "aluno" },
-    { id: 4, nome: "Ana Paula", tipo: "aluno" },
-    { id: 5, nome: "Fernanda Dias", tipo: "funcionario" },
-  ];
-  if (!nome) return [];
-  return todos.filter(u => u.nome.toLowerCase().includes(nome.toLowerCase()));
-}
-
-// Simula busca de livros por título (mock, substitua por chamada real ao backend futuramente)
-async function buscarLivrosPorTitulo(titulo: string, livros: Livro[]): Promise<Livro[]> {
-  if (!titulo) return [];
-  return livros.filter(l => l.titulo.toLowerCase().includes(titulo.toLowerCase()));
-}
-
 export default function Livros() {
   const [livros, setLivros] = useState<Livro[]>([]);
   const [busca, setBusca] = useState('');
@@ -126,7 +105,7 @@ export default function Livros() {
 
   useEffect(() => {
     if (modalLivro && buscaUsuario.length > 1) {
-      buscarUsuariosPorNome(buscaUsuario).then(setUsuariosFiltrados);
+      api.get<Usuario[]>(`/usuarios?nome=${buscaUsuario}`).then((res) => setUsuariosFiltrados(res.data));
     } else {
       setUsuariosFiltrados([]);
     }
@@ -134,7 +113,7 @@ export default function Livros() {
 
   useEffect(() => {
     if (modalReservaLivro && buscaUsuarioReserva.length > 1) {
-      buscarUsuariosPorNome(buscaUsuarioReserva).then(setUsuariosFiltradosReserva);
+      api.get<Usuario[]>(`/usuarios?nome=${buscaUsuarioReserva}`).then((res) => setUsuariosFiltradosReserva(res.data));
     } else {
       setUsuariosFiltradosReserva([]);
     }
@@ -142,7 +121,7 @@ export default function Livros() {
 
   useEffect(() => {
     if (modalLivro && buscaLivroEmprestimo.length > 1) {
-      buscarLivrosPorTitulo(buscaLivroEmprestimo, livros).then(setLivrosFiltradosEmprestimo);
+      api.get<Livro[]>(`/livros?titulo=${buscaLivroEmprestimo}`).then((res) => setLivrosFiltradosEmprestimo(res.data));
     } else {
       setLivrosFiltradosEmprestimo([]);
     }
@@ -150,7 +129,7 @@ export default function Livros() {
 
   useEffect(() => {
     if (modalReservaLivro && buscaLivroReserva.length > 1) {
-      buscarLivrosPorTitulo(buscaLivroReserva, livros).then(setLivrosFiltradosReserva);
+      api.get<Livro[]>(`/livros?titulo=${buscaLivroReserva}`).then((res) => setLivrosFiltradosReserva(res.data));
     } else {
       setLivrosFiltradosReserva([]);
     }
@@ -161,7 +140,7 @@ export default function Livros() {
     if (buscaLivroFiltro.length === 0) {
       setLivrosFiltradosDropdown(livros);
     } else if (buscaLivroFiltro.length > 1) {
-      buscarLivrosPorTitulo(buscaLivroFiltro, livros).then(setLivrosFiltradosDropdown);
+      api.get<Livro[]>(`/livros?titulo=${buscaLivroFiltro}`).then((res) => setLivrosFiltradosDropdown(res.data));
     } else {
       setLivrosFiltradosDropdown([]);
     }
