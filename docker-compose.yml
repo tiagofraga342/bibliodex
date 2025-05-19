@@ -29,6 +29,7 @@ services:
       DATABASE_URL: postgres://bibliodex:bibliodex@db:5432/bibliodex_db
     volumes:
       - ./backend:/code
+      - ./scripts:/scripts
 
 volumes:
   db_data:
