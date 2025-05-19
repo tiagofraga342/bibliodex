@@ -3,23 +3,28 @@ version: '3.8'
 services:
   db:
     image: postgres:15
-    restart: always
+    ports:
+      - "5433:5432"
     environment:
       POSTGRES_USER: bibliodex
       POSTGRES_PASSWORD: bibliodex
       POSTGRES_DB: bibliodex_db
-    ports:
-      - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bibliodex -d bibliodex_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   api:
     build: ./backend
     ports:
       - "8000:8000"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
       DATABASE_URL: postgres://bibliodex:bibliodex@db:5432/bibliodex_db
     volumes:
