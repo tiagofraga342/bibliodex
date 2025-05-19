@@ -36,9 +36,6 @@ venv/
 **/db_data/
 docker-compose.override.yml
 
-# Postgres init dump
-init.sql
-
 # Node.js
 node_modules/
 npm-debug.log
