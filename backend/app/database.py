@@ -1,26 +1,27 @@
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, Session as SQLAlchemySession # Alias to avoid confusion
+from app.models import Base # Import Base from your models.py
 import os
-import psycopg2
-from psycopg2.extras import RealDictCursor
-from psycopg2 import pool
 
-DATABASE_URL = os.getenv(
+SQLALCHEMY_DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql://bibliodex:bibliodex@localhost:5432/bibliodex_db"
 )
 
-# Cria pool de conexões
-pg_pool = pool.SimpleConnectionPool(
-    minconn=1,
-    maxconn=10,
-    dsn=DATABASE_URL
-)
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
 
+# If you are using Alembic for migrations, Base.metadata.create_all(bind=engine)
+# should not be called here directly in production.
+# For development, you might call it to create tables if they don't exist.
+# Consider where to best place this:
+# Base.metadata.create_all(bind=engine) # Creates tables if they don't exist
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Dependency to get DB session
 def get_db():
-    conn = pg_pool.getconn()
+    db: SQLAlchemySession = SessionLocal()
     try:
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
-        yield cursor
-        conn.commit()
+        yield db
     finally:
-        cursor.close()
-        pg_pool.putconn(conn)
+        db.close()

@@ -2,35 +2,42 @@ version: '3.8'
 
 services:
   db:
-    image: postgres:15
+    image: postgres:15-alpine # Sugestão: -alpine para uma imagem menor do Postgres
     ports:
-      - "5433:5432"
+      - "5433:5432" # Mapeia porta 5433 do host para 5432 do container
     environment:
       POSTGRES_USER: bibliodex
-      POSTGRES_PASSWORD: bibliodex
+      POSTGRES_PASSWORD: bibliodex # Considere usar secrets ou .env file para produção
       POSTGRES_DB: bibliodex_db
     volumes:
-      - db_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/:ro
+      - db_data:/var/lib/postgresql/data # Volume nomeado para persistir dados do banco
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro # CORRIGIDO: Monta o init.sql DENTRO do diretório :ro (read-only)
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U bibliodex -d bibliodex_db"]
-      interval: 5s
+      interval: 10s # Intervalo um pouco maior para dar tempo ao DB
       timeout: 5s
       retries: 5
+    restart: unless-stopped # Adicionado para reiniciar o DB a menos que parado manualmente
 
   api:
-    build: ./backend
+    build:
+      context: ./backend # Especifica o diretório do Dockerfile
+      dockerfile: Dockerfile # Especifica o nome do Dockerfile (opcional se for 'Dockerfile')
     ports:
       - "8000:8000"
     depends_on:
       db:
-        condition: service_healthy
+        condition: service_healthy # Garante que o DB esteja saudável antes da API iniciar
     environment:
-      DATABASE_URL: postgres://bibliodex:bibliodex@db:5432/bibliodex_db
+      # CORRIGIDO: Usando 'postgresql' como esquema para SQLAlchemy
+      DATABASE_URL: postgresql://bibliodex:bibliodex@db:5432/bibliodex_db
+      # PYTHONUNBUFFERED: 1 # Garante que os logs do Python apareçam imediatamente (útil para debug)
     volumes:
+      # Para desenvolvimento: monta o código local no container para live reload.
+      # Para produção: remova este volume para usar o código copiado na imagem Docker.
       - ./backend:/code
-      - ./scripts:/scripts
+      # - ./scripts:/scripts # Descomente se você tiver um diretório de scripts para montar
+    restart: unless-stopped # Adicionado para reiniciar a API a menos que parada manualmente
 
 volumes:
-  db_data:
-
+  db_data: # Define o volume nomeado para persistência dos dados do banco
