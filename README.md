@@ -1,6 +1,6 @@
-# 📚 Bibliodex
+# 📚 Bibliodex - Sistema de Gerenciamento de Biblioteca
 
-**Bibliodex** é um sistema inteligente de gestão de bibliotecas universitárias, desenvolvido como projeto da disciplina de Banco de Dados II do curso de Sistemas de Informação da EACH-USP. Ele permite o controle eficiente de empréstimos, reservas, devoluções e acervos, com foco em **otimização de banco de dados** e **uso crítico de Inteligência Artificial Generativa (IAG)** durante o ciclo de desenvolvimento.
+**Bibliodex** é um sistema inteligente e completo para gerenciamento de bibliotecas universitárias, permitindo o controle eficiente de empréstimos, reservas, devoluções e acervos. Desenvolvido como projeto da disciplina de Banco de Dados II do curso de Sistemas de Informação da EACH-USP, o sistema foca em **otimização de banco de dados** e **uso crítico de Inteligência Artificial Generativa (IAG)** durante o ciclo de desenvolvimento.
 
 ---
 
@@ -29,20 +29,6 @@
 
 ---
 
-## 🗃️ Modelo de Dados
-
-O banco de dados foi estruturado com base na normalização e foco em consultas otimizadas. Ele inclui ao menos 10 tabelas principais:
-
-- `usuario`, `livro`, `autor`, `categoria`, `emprestimo`, `reserva`, `devolucao`, `penalidade`, `funcionario`, `curso`
-
-Com as seguintes otimizações:
-- Índices compostos (`livro(titulo, id_categoria)`, `emprestimo(id_usuario, data_emprestimo)`)
-- Views materializadas (livros disponíveis, histórico do usuário)
-- Particionamento por semestre (`emprestimo`)
-- Uso de `EXPLAIN ANALYZE` para tuning das principais queries
-
----
-
 ## 📊 IA Generativa no Projeto
 
 Durante o desenvolvimento, utilizamos **IA Generativa** em diversas etapas:
@@ -54,6 +40,34 @@ Durante o desenvolvimento, utilizamos **IA Generativa** em diversas etapas:
 | Plano de testes              | Criação de cenários e dados fictícios com IA               |
 | Otimizações                  | Análise de EXPLAIN e sugestões de índices via ChatGPT      |
 | Documentação                 | Escrita colaborativa de README, comentários e relatórios   |
+
+---
+
+## 🚀 Como Executar o Projeto
+
+1.  **Clone o repositório:**
+    ```bash
+    git clone <url-do-repositorio>
+    cd bibliodex
+    ```
+
+2.  **Variáveis de Ambiente (Backend):**
+    *   No diretório `backend/`, se necessário, crie um arquivo `.env` baseado em um exemplo (se houver) ou configure as variáveis diretamente no `docker-compose.yml` se preferir para desenvolvimento. As chaves importantes são `DATABASE_URL` (já configurada para o serviço `db` no Docker Compose) e `SECRET_KEY` para JWT.
+    *   **Importante:** Para produção, a `SECRET_KEY` deve ser forte e única.
+
+3.  **Inicialização do Banco de Dados:**
+    *   O arquivo `init.sql` na raiz do projeto será executado automaticamente na primeira vez que o contêiner do banco de dados (`db`) for iniciado, criando as tabelas necessárias.
+
+4.  **Suba os contêineres com Docker Compose:**
+    Na raiz do projeto (`bibliodex/`), execute:
+    ```bash
+    docker-compose up --build
+    ```
+    *   O `--build` é recomendado na primeira vez ou após alterações nos Dockerfiles.
+
+5.  **Acesso às Aplicações:**
+    *   **Frontend:** [http://localhost:3001](http://localhost:3001)
+    *   **Backend API (Swagger UI):** [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ---
 

@@ -1,137 +1,72 @@
-# Bibliodex Backend API
+# Bibliodex - Backend
 
-Este é o backend da aplicação Bibliodex, construído com FastAPI, Python, SQLAlchemy e PostgreSQL. Ele fornece uma API RESTful para gerenciar livros, usuários, empréstimos, reservas e outras funcionalidades do sistema de biblioteca.
+Esta é a API backend para o sistema Bibliodex, desenvolvida com FastAPI (Python).
 
-## ✨ Funcionalidades
+## Funcionalidades Principais
 
-- Gerenciamento completo de CRUD para Livros, Autores, Categorias, Usuários, Funcionários, Exemplares, Empréstimos, Reservas, Devoluções e Penalidades.
-- Autenticação baseada em JWT (JSON Web Tokens) para Usuários e Funcionários.
-- Autorização baseada em papéis (usuário cliente, funcionário).
-- Validação de dados robusta utilizando Pydantic.
-- Logging centralizado para rastreamento de requisições e erros.
-- Tratamento de exceções global.
-- Configuração de CORS para permitir requisições do frontend.
-- Suporte a Docker para fácil implantação.
+*   **Endpoints CRUD:** Para todas as entidades principais: Livros, Autores, Categorias, Exemplares, Usuários, Funcionários, Empréstimos, Reservas, Devoluções.
+*   **Autenticação:** Sistema de login baseado em JWT (JSON Web Tokens) para usuários e funcionários. Geração de access tokens e refresh tokens.
+*   **Autorização:** Proteção de rotas baseada no papel do usuário autenticado (ex: apenas funcionários podem acessar certas rotas de gerenciamento).
+*   **Validação de Dados:** Uso de Pydantic para validação de entrada e serialização de saída.
+*   **ORM:** SQLAlchemy para interação com o banco de dados PostgreSQL.
+*   **Documentação Automática da API:** Swagger UI e ReDoc disponíveis.
 
-## 🛠️ Tecnologias Utilizadas
+## Documentação da API
 
-- **Python 3.11+**
-- **FastAPI**: Framework web moderno e de alta performance.
-- **SQLAlchemy**: ORM para interação com o banco de dados.
-- **Pydantic**: Validação de dados e gerenciamento de configurações.
-- **PostgreSQL**: Banco de dados relacional.
-- **Uvicorn & Gunicorn**: Servidores ASGI.
-- **Docker**: Containerização da aplicação.
-- **Alembic**: (Recomendado para) Gerenciamento de migrações de banco de dados.
-- **python-jose & passlib**: Para JWT e hashing de senhas.
+Após iniciar a aplicação, a documentação interativa da API (Swagger UI) estará disponível em:
+[http://localhost:8000/docs](http://localhost:8000/docs)
 
-## ⚙️ Configuração e Execução
+A documentação alternativa (ReDoc) estará disponível em:
+[http://localhost:8000/redoc](http://localhost:8000/redoc)
 
-### Pré-requisitos
+## Variáveis de Ambiente
 
-- Python 3.11 ou superior
-- Docker (opcional, para execução em container)
-- PostgreSQL Server
+As seguintes variáveis de ambiente são importantes para a configuração do backend:
 
-### Variáveis de Ambiente
+*   `DATABASE_URL`: String de conexão com o banco de dados PostgreSQL.
+    *   Exemplo: `postgresql://bibliodex_user:bibliodex_password@db:5432/bibliodex_db` (usado no `docker-compose.yml`)
+*   `SECRET_KEY`: Chave secreta para a codificação e decodificação de tokens JWT. **Deve ser longa, complexa e mantida em segredo em produção.**
+*   `ALLOWED_ORIGINS`: Lista de origens CORS permitidas (separadas por vírgula).
+    *   Exemplo: `http://localhost:3001,http://127.0.0.1:3001`
 
-Crie um arquivo `.env` na raiz do diretório `backend` (ou configure as variáveis diretamente no seu ambiente) com as seguintes variáveis:
+Para desenvolvimento local (fora do Docker), você pode criar um arquivo `.env` na raiz da pasta `backend/` para definir essas variáveis.
 
-```env
-DATABASE_URL="postgresql://user:password@host:port/dbname"
-SECRET_KEY="sua_chave_secreta_super_segura_para_jwt"
-ALLOWED_ORIGINS="http://localhost:3000,https://seu-frontend-em-producao.com"
-# Para Alembic (se utilizado):
-# ALEMBIC_DATABASE_URL=${DATABASE_URL}
-```
+## Como Executar (via Docker Compose)
 
-- `DATABASE_URL`: String de conexão para o banco de dados PostgreSQL.
-- `SECRET_KEY`: Chave secreta para codificar e decodificar os tokens JWT. Use um valor longo e aleatório.
-- `ALLOWED_ORIGINS`: Lista separada por vírgulas das URLs de origem permitidas para CORS.
+As instruções para executar o backend como parte do sistema completo estão no [README principal do projeto](../README.md).
 
-### 1. Executando com Docker (Recomendado para Produção/Simplicidade)
+## Desenvolvimento Local (Fora do Docker)
 
-1.  **Construa a imagem Docker:**
+1.  **Navegue até o diretório do backend:**
     ```bash
-    docker build -t bibliodex-backend .
+    cd backend
     ```
-
-2.  **Execute o container:**
-    Substitua os placeholders pelas suas variáveis de ambiente.
-    ```bash
-    docker run -d -p 8000:8000 \
-      -e DATABASE_URL="postgresql://bibliodex:bibliodex@localhost:5432/bibliodex_db" \
-      -e SECRET_KEY="sua_chave_secreta_aqui" \
-      -e ALLOWED_ORIGINS="http://localhost:3000" \
-      --name bibliodex-backend-container \
-      bibliodex-backend
-    ```
-    (Ajuste `localhost` no `DATABASE_URL` para o IP do host da máquina Docker se o PostgreSQL estiver rodando fora de um container na mesma rede Docker, ou use `host.docker.internal` em alguns sistemas).
-
-### 2. Executando Localmente (Para Desenvolvimento)
-
-1.  **Crie e ative um ambiente virtual:**
+2.  **Crie e ative um ambiente virtual (recomendado):**
     ```bash
     python -m venv venv
-    source venv/bin/activate  # No Windows: venv\Scripts\activate
+    source venv/bin/activate  # Linux/macOS
+    # venv\Scripts\activate    # Windows
     ```
-
-2.  **Instale as dependências:**
+3.  **Instale as dependências:**
     ```bash
     pip install -r requirements.txt
     ```
+4.  **Configure as variáveis de ambiente:**
+    Crie um arquivo `.env` na raiz da pasta `backend/` com o conteúdo necessário (veja a seção "Variáveis de Ambiente"). Certifique-se de que o PostgreSQL esteja acessível conforme a `DATABASE_URL` configurada.
 
-3.  **Configure as variáveis de ambiente** (conforme descrito acima, pode ser exportando-as no terminal ou usando um arquivo `.env` com `python-dotenv` se adicionado ao projeto).
-
-4.  **(Opcional/Recomendado) Execute as migrações do banco de dados (se estiver usando Alembic):**
+5.  **Execute o servidor de desenvolvimento Uvicorn:**
+    A partir da pasta `backend/`:
     ```bash
-    # alembic upgrade head
+    uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
     ```
-    Se não estiver usando Alembic, as tabelas podem ser criadas pela aplicação na primeira execução se `models.Base.metadata.create_all(bind=engine)` estiver habilitado em `main.py` ou `database.py` (geralmente para desenvolvimento).
+    A API estará disponível em `http://localhost:8000`.
 
-5.  **Inicie o servidor de desenvolvimento Uvicorn:**
-    A partir do diretório `backend/`:
-    ```bash
-    uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-    ```
+## Estrutura dos Módulos Principais (dentro de `backend/app/`)
 
-## 📖 Documentação da API
-
-Com o servidor em execução, a documentação interativa da API (Swagger UI) estará disponível em:
-`http://localhost:8000/docs`
-
-E a documentação alternativa (ReDoc) em:
-`http://localhost:8000/redoc`
-
-## 🏗️ Estrutura do Projeto
-
-```
-backend/
-├── app/
-│   ├── __init__.py
-│   ├── crud.py           # Funções de Create, Read, Update, Delete
-│   ├── database.py       # Configuração da conexão com o banco
-│   ├── main.py           # Ponto de entrada da aplicação FastAPI
-│   ├── models.py         # Modelos SQLAlchemy (tabelas do banco)
-│   ├── schemas.py        # Schemas Pydantic (validação de dados da API)
-│   ├── security.py       # Funções de segurança (hashing, JWT)
-│   └── routers/          # Módulos com os endpoints da API
-│       ├── __init__.py
-│       ├── auth.py
-│       ├── livros.py
-│       └── ...           # Outros routers
-├── tests/                # Testes da aplicação (pytest)
-├── alembic/              # (Se usado) Configurações e migrações Alembic
-├── alembic.ini           # (Se usado) Configuração do Alembic
-├── Dockerfile            # Define a imagem Docker para o backend
-├── requirements.txt      # Dependências Python
-└── README.md             # Este arquivo
-```
-
-## 📝 Logging
-
-A aplicação utiliza o módulo `logging` do Python. Os logs são configurados em `app/main.py` e exibidos no console. Em produção, considere configurar handlers para arquivos ou serviços de logging centralizado.
-
-## 🤝 Contribuição
-
-Contribuições são bem-vindas! Sinta-se à vontade para abrir issues ou pull requests.
+*   `main.py`: Ponto de entrada da aplicação FastAPI, configuração de routers e CORS.
+*   `database.py`: Configuração da sessão do banco de dados e motor SQLAlchemy.
+*   `models.py`: Definições dos modelos de dados SQLAlchemy.
+*   `schemas.py`: Definições dos schemas Pydantic para validação e serialização.
+*   `crud.py`: Funções de Create, Read, Update, Delete para interagir com o banco de dados.
+*   `security.py`: Funções relacionadas à segurança, como hashing de senhas e manipulação de JWT.
+*   `routers/`: Contém os módulos que definem os endpoints da API para cada recurso (ex: `livros.py`, `usuarios.py`, `auth.py`).

@@ -1,3 +1,73 @@
+# Bibliodex - Frontend
+
+Esta é a aplicação frontend para o sistema Bibliodex, desenvolvida com Next.js, React, TypeScript e Tailwind CSS.
+
+## Funcionalidades Implementadas
+
+*   **Autenticação:**
+    *   Página de Login.
+    *   Proteção de rotas baseada em papéis (usuário cliente, funcionário).
+*   **Usuários Clientes:**
+    *   Visualização de "Meus Empréstimos".
+    *   Visualização e cancelamento de "Minhas Reservas".
+    *   Visualização de catálogo de livros.
+*   **Funcionários:**
+    *   Gerenciamento completo de Livros (CRUD).
+    *   Gerenciamento de Categorias e Autores (visualização básica, criação via gestão de livros).
+    *   Gerenciamento de Exemplares (CRUD).
+    *   Gerenciamento de Usuários (CRUD).
+    *   Gerenciamento de Funcionários (CRUD).
+    *   Gestão de Empréstimos (visualização, registro de devolução).
+    *   Gestão de Reservas (visualização, criação, cancelamento).
+    *   Registro de Devoluções.
+    *   Página de Administração (placeholder).
+    *   Página de Relatórios (placeholder).
+
+## Variáveis de Ambiente
+
+*   `NEXT_PUBLIC_API_BASE_URL`: URL base da API backend. No ambiente Docker Compose, esta variável é configurada no `Dockerfile` para `http://backend:8000`. Para desenvolvimento local fora do Docker, você pode criar um arquivo `.env.local` na raiz do frontend com:
+    ```env
+    NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+    ```
+
+## Como Executar (via Docker Compose)
+
+As instruções para executar o frontend como parte do sistema completo estão no [README principal do projeto](../README.md).
+
+## Desenvolvimento Local (Fora do Docker)
+
+1.  **Navegue até o diretório do frontend:**
+    ```bash
+    cd frontend
+    ```
+2.  **Instale as dependências:**
+    ```bash
+    npm install
+    # ou
+    yarn install
+    ```
+3.  **Configure as variáveis de ambiente:**
+    Crie um arquivo `.env.local` na raiz da pasta `frontend/` e adicione:
+    ```
+    NEXT_PUBLIC_API_BASE_URL=http://localhost:8000 
+    ```
+    (Ajuste a URL se o backend estiver rodando em uma porta diferente localmente).
+
+4.  **Execute o servidor de desenvolvimento:**
+    ```bash
+    npm run dev
+    # ou
+    yarn dev
+    ```
+    A aplicação estará disponível em `http://localhost:3000` (ou outra porta, se configurada).
+
+## Scripts Disponíveis
+
+*   `dev`: Inicia o servidor de desenvolvimento.
+*   `build`: Compila a aplicação para produção.
+*   `start`: Inicia um servidor de produção após o `build`.
+*   `lint`: Executa o linter.
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
 ## Getting Started
