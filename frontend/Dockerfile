@@ -4,7 +4,7 @@ FROM node:18-alpine AS base
 # Set working directory
 WORKDIR /app
 
-# Install dependencies (แยกขั้นตอนเพื่อใช้ cache)
+# Install dependencies 
 FROM base AS deps
 COPY package.json yarn.lock* package-lock.json* ./
 RUN \
@@ -46,9 +46,6 @@ USER node
 
 EXPOSE 3000
 
-# Next.js collects anonymous telemetry data about general usage.
-# Learn more here: https://nextjs.org/telemetry
-# Uncomment the following line in case you want to disable telemetry.
-# ENV NEXT_TELEMETRY_DISABLED 1
-
-CMD ["node", "server.js"]
+# CMD ["node", "server.js"]
+# Adiciona um echo antes de iniciar o servidor Node.js
+CMD ["sh", "-c", "echo 'INFO: Frontend acessível externamente em http://localhost:3001' && node server.js"]
