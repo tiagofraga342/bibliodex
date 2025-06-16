@@ -1,22 +1,19 @@
 "use client";
 import * as React from "react";
 import { useState, useEffect } from "react";
+import api, { EmprestimoRead, LivroRead, AutorReadBasic } from "../api";
+import { useAuth } from "../contexts/AuthContext";
+import withAuth from "../components/withAuth";
 
-interface Emprestimo {
-  id: number;
-  livro: { id: number; titulo: string; autor: string; categoria?: string };
-  usuario: { id: number; nome: string; tipo: string };
-  dataEmprestimo: string;
-  dataDevolucao: string | null;
-  status: "Em andamento" | "Devolvido";
-}
-
-export default function PainelEmprestimos() {
-  const [filtroUsuario, setFiltroUsuario] = useState("");
-  const [filtroLivro, setFiltroLivro] = useState("");
+function EmprestimosPage() {
+  const { user } = useAuth();
+  const [filtroUsuario, setFiltroUsuario] = useState(""); // ID do usuário
+  const [filtroLivro, setFiltroLivro] = useState(""); // ID do livro
+  const [filtroAutor, setFiltroAutor] = useState(""); // Nome do autor
+  const [filtroCategoria, setFiltroCategoria] = useState(""); // Nome da categoria
   const [filtroStatus, setFiltroStatus] = useState("");
-  const [emprestimos, setEmprestimos] = useState<Emprestimo[]>([]);
-  const [modalDetalhes, setModalDetalhes] = useState<Emprestimo | null>(null);
+  const [emprestimos, setEmprestimos] = useState<EmprestimoRead[]>([]);
+  const [modalDetalhes, setModalDetalhes] = useState<EmprestimoRead | null>(null);
 
   // Estados e refs para dropdowns
   const [isDropdownUsuarioOpen, setIsDropdownUsuarioOpen] = useState(false);
@@ -25,35 +22,74 @@ export default function PainelEmprestimos() {
   const livroDropdownRef = React.useRef<HTMLDivElement>(null);
 
   // Dropdowns para autor e categoria (filtros)
-  const [dropdownAutorFiltroAberto, setDropdownAutorFiltroAberto] = React.useState(false);
+  const [dropdownAutorFiltroAberto, setDropdownAutorFiltroAberto] = useState(false);
   const dropdownAutorFiltroRef = React.useRef<HTMLDivElement>(null);
-  const [dropdownCategoriaFiltroAberto, setDropdownCategoriaFiltroAberto] = React.useState(false);
+  const [dropdownCategoriaFiltroAberto, setDropdownCategoriaFiltroAberto] = useState(false);
   const dropdownCategoriaFiltroRef = React.useRef<HTMLDivElement>(null);
-  const [autoresFiltradosDropdown, setAutoresFiltradosDropdown] = React.useState<string[]>([]);
-  const [categoriasFiltradasDropdown, setCategoriasFiltradasDropdown] = React.useState<string[]>([]);
-  const [filtroAutor, setFiltroAutor] = React.useState("");
-  const [filtroCategoria, setFiltroCategoria] = React.useState("");
+  const [autoresFiltradosDropdown, setAutoresFiltradosDropdown] = useState<string[]>([]);
+  const [categoriasFiltradasDropdown, setCategoriasFiltradasDropdown] = useState<string[]>([]);
+  const [filtroUsuarioNome, setFiltroUsuarioNome] = useState("");
+  const [filtroLivroTitulo, setFiltroLivroTitulo] = useState("");
 
-  // Dropdowns para usuário e livro (filtros)
-  const [dropdownUsuarioFiltroAberto, setDropdownUsuarioFiltroAberto] = React.useState(false);
-  const dropdownUsuarioFiltroRef = React.useRef<HTMLDivElement>(null);
-  const [dropdownLivroFiltroAberto, setDropdownLivroFiltroAberto] = React.useState(false);
-  const dropdownLivroFiltroRef = React.useRef<HTMLDivElement>(null);
-  const [usuariosFiltradosDropdown, setUsuariosFiltradosDropdown] = React.useState<string[]>([]);
-  const [livrosFiltradosDropdown, setLivrosFiltradosDropdown] = React.useState<string[]>([]);
-  const [filtroUsuarioNome, setFiltroUsuarioNome] = React.useState("");
-  const [filtroLivroTitulo, setFiltroLivroTitulo] = React.useState("");
+  // Estados para autocomplete de usuário/livro
+  const [usuariosFiltradosDropdown, setUsuariosFiltradosDropdown] = useState<string[]>([]);
+  const [livrosFiltradosDropdown, setLivrosFiltradosDropdown] = useState<string[]>([]);
 
   // Gerar listas únicas de autores/categorias
-  const autoresUnicos = React.useMemo(() => Array.from(new Set(emprestimos.map(e => e.livro.autor))).sort(), [emprestimos]);
-  const categoriasUnicas = React.useMemo(() => Array.from(new Set(emprestimos.map(e => e.livro.categoria).filter(Boolean))).sort(), [emprestimos]);
+  const autoresUnicos = React.useMemo(
+    () =>
+      Array.from(
+        new Set(
+          emprestimos
+            .flatMap(e =>
+              e.exemplar && (e as any).exemplar.livro && Array.isArray((e as any).exemplar.livro.autores)
+                ? (e as any).exemplar.livro.autores.map((a: AutorReadBasic) => a.nome)
+                : []
+            )
+        )
+      ).sort(),
+    [emprestimos]
+  );
+  // Corrija categoriasUnicas: deve considerar todos os livros dos exemplares, não apenas o primeiro encontrado
+  const categoriasUnicas = React.useMemo(
+    () =>
+      Array.from(
+        new Set(
+          emprestimos
+            .flatMap(e =>
+              e.exemplar && (e as any).exemplar.livro && (e as any).exemplar.livro.categoria?.nome
+                ? [(e as any).exemplar.livro.categoria.nome]
+                : []
+            )
+        )
+      ).sort(),
+    [emprestimos]
+  );
 
   // Gerar listas únicas de usuários/livros
-  const usuariosUnicos = React.useMemo(() => Array.from(new Set(emprestimos.map(e => e.usuario.nome))).sort(), [emprestimos]);
-  const livrosUnicos = React.useMemo(() => Array.from(new Set(emprestimos.map(e => e.livro.titulo))).sort(), [emprestimos]);
+  const usuariosUnicos = React.useMemo(
+    () =>
+      Array.from(
+        new Map(
+          emprestimos.map(e => [e.usuario.id_usuario, e.usuario])
+        ).values()
+      ),
+    [emprestimos]
+  );
+  const livrosUnicos = React.useMemo(
+    () =>
+      Array.from(
+        new Map(
+          emprestimos
+            .filter(e => (e as any).exemplar.livro)
+            .map(e => [(e as any).exemplar.livro.id_livro, (e as any).exemplar.livro])
+        ).values()
+      ),
+    [emprestimos]
+  );
 
   // Atualizar dropdown de autores
-  React.useEffect(() => {
+  useEffect(() => {
     if (filtroAutor.length === 0) {
       setAutoresFiltradosDropdown(autoresUnicos);
     } else if (filtroAutor.length > 1) {
@@ -64,7 +100,7 @@ export default function PainelEmprestimos() {
   }, [filtroAutor, autoresUnicos]);
 
   // Atualizar dropdown de categorias
-  React.useEffect(() => {
+  useEffect(() => {
     if (filtroCategoria.length === 0) {
       setCategoriasFiltradasDropdown(categoriasUnicas as string[]);
     } else if (filtroCategoria.length > 1) {
@@ -75,29 +111,37 @@ export default function PainelEmprestimos() {
   }, [filtroCategoria, categoriasUnicas]);
 
   // Atualizar dropdown de usuários
-  React.useEffect(() => {
+  useEffect(() => {
     if (filtroUsuarioNome.length === 0) {
-      setUsuariosFiltradosDropdown(usuariosUnicos);
+      setUsuariosFiltradosDropdown(usuariosUnicos.map(u => u.nome));
     } else if (filtroUsuarioNome.length > 1) {
-      setUsuariosFiltradosDropdown(usuariosUnicos.filter(u => u.toLowerCase().includes(filtroUsuarioNome.toLowerCase())));
+      setUsuariosFiltradosDropdown(
+        usuariosUnicos
+          .filter(u => u.nome.toLowerCase().includes(filtroUsuarioNome.toLowerCase()))
+          .map(u => u.nome)
+      );
     } else {
       setUsuariosFiltradosDropdown([]);
     }
   }, [filtroUsuarioNome, usuariosUnicos]);
 
   // Atualizar dropdown de livros
-  React.useEffect(() => {
+  useEffect(() => {
     if (filtroLivroTitulo.length === 0) {
-      setLivrosFiltradosDropdown(livrosUnicos);
+      setLivrosFiltradosDropdown(livrosUnicos.map(l => l.titulo));
     } else if (filtroLivroTitulo.length > 1) {
-      setLivrosFiltradosDropdown(livrosUnicos.filter(l => l.toLowerCase().includes(filtroLivroTitulo.toLowerCase())));
+      setLivrosFiltradosDropdown(
+        livrosUnicos
+          .filter(l => l.titulo.toLowerCase().includes(filtroLivroTitulo.toLowerCase()))
+          .map(l => l.titulo)
+      );
     } else {
       setLivrosFiltradosDropdown([]);
     }
   }, [filtroLivroTitulo, livrosUnicos]);
 
   // Fechar dropdown ao clicar fora
-  React.useEffect(() => {
+  useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (usuarioDropdownRef.current && !usuarioDropdownRef.current.contains(event.target as Node)) {
         setIsDropdownUsuarioOpen(false);
@@ -111,12 +155,6 @@ export default function PainelEmprestimos() {
       if (dropdownCategoriaFiltroRef.current && !dropdownCategoriaFiltroRef.current.contains(event.target as Node)) {
         setDropdownCategoriaFiltroAberto(false);
       }
-      if (dropdownUsuarioFiltroRef.current && !dropdownUsuarioFiltroRef.current.contains(event.target as Node)) {
-        setDropdownUsuarioFiltroAberto(false);
-      }
-      if (dropdownLivroFiltroRef.current && !dropdownLivroFiltroRef.current.contains(event.target as Node)) {
-        setDropdownLivroFiltroAberto(false);
-      }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -124,48 +162,92 @@ export default function PainelEmprestimos() {
 
   useEffect(() => {
     async function fetchData() {
+      if (!user) return;
       try {
-        const [emprestimosRes, usuariosRes, livrosRes] = await Promise.all([
-          fetch('/api/emprestimos'),
-          fetch('/api/usuarios'),
-          fetch('/api/livros')
-        ]);
-
-        const [emprestimosData, usuariosData, livrosData] = await Promise.all([
-          emprestimosRes.json(),
-          usuariosRes.json(),
-          livrosRes.json()
-        ]);
-
-        setEmprestimos(emprestimosData);
-        // Atualizar estados de usuários e livros se necessário
+        const emprestimosRes = await api.get<EmprestimoRead[]>("/emprestimos");
+        setEmprestimos(emprestimosRes.data);
       } catch (error) {
         console.error('Erro ao buscar dados:', error);
       }
     }
-
     fetchData();
-  }, []);
+  }, [user]);
+
+  function statusEmprestimoLabel(status: string) {
+    switch (status) {
+      case "ativo":
+        return "Em andamento";
+      case "devolvido":
+        return "Devolvido";
+      case "atrasado":
+        return "Atrasado";
+      default:
+        return status;
+    }
+  }
 
   function filtrarEmprestimos() {
     return emprestimos.filter(e =>
-      (!filtroUsuario || String(e.usuario.id) === filtroUsuario) &&
-      (!filtroLivro || String(e.livro.id) === filtroLivro) &&
-      (!filtroStatus || e.status === filtroStatus) &&
-      (!filtroAutor || e.livro.autor === filtroAutor) &&
-      (!filtroCategoria || e.livro.categoria === filtroCategoria)
-    );
-  }
-
-  function registrarDevolucao(id: number) {
-    setEmprestimos(emps =>
-      emps.map(e =>
-        e.id === id && e.status === "Em andamento"
-          ? { ...e, status: "Devolvido", dataDevolucao: new Date().toISOString().slice(0, 10) }
-          : e
+      (!filtroUsuario || String(e.usuario.id_usuario) === filtroUsuario) &&
+      (!filtroLivro || ((e as any).exemplar.livro && String((e as any).exemplar.livro.id_livro) === filtroLivro)) &&
+      (!filtroStatus || e.status_emprestimo === filtroStatus) &&
+      (!filtroAutor ||
+        ((e as any).exemplar.livro &&
+          Array.isArray((e as any).exemplar.livro.autores) &&
+          (e as any).exemplar.livro.autores.some((a: AutorReadBasic) =>
+            a.nome.toLowerCase().includes(filtroAutor.toLowerCase())
+          ))
+      ) &&
+      (!filtroCategoria ||
+        ((e as any).exemplar.livro &&
+          (e as any).exemplar.livro.categoria &&
+          (e as any).exemplar.livro.categoria.nome.toLowerCase().includes(filtroCategoria.toLowerCase()))
       )
     );
   }
+
+  async function registrarDevolucao(id: number) {
+    try {
+      const emprestimoToUpdate = emprestimos.find(e => e.id_emprestimo === id);
+      if (emprestimoToUpdate) {
+        const payload = {
+          data_devolucao: new Date().toISOString().slice(0, 10),
+          id_emprestimo: id,
+        };
+        await api.post('/devolucoes', payload);
+        const emprestimosRes = await api.get<EmprestimoRead[]>("/emprestimos");
+        setEmprestimos(emprestimosRes.data);
+      }
+    } catch (error) {
+      console.error("Erro ao registrar devolução:", error);
+    }
+  }
+
+  // Corrija o fetchLivroDetalhe: busque pelo id_livro do exemplar, não por modalDetalhes.exemplar.livro
+  const [livroDetalhe, setLivroDetalhe] = useState<{ titulo: string; autores: string[] } | null>(null);
+
+  useEffect(() => {
+    async function fetchLivroDetalhe() {
+      const idLivro =
+        modalDetalhes && (modalDetalhes.exemplar as any)?.id_livro
+          ? (modalDetalhes.exemplar as any).id_livro
+          : null;
+      if (idLivro) {
+        try {
+          const res = await api.get<LivroRead>(`/livros/${idLivro}`);
+          setLivroDetalhe({
+            titulo: res.data.titulo,
+            autores: Array.isArray(res.data.autores) ? res.data.autores.map((a: AutorReadBasic) => a.nome) : [],
+          });
+        } catch {
+          setLivroDetalhe(null);
+        }
+      } else {
+        setLivroDetalhe(null);
+      }
+    }
+    fetchLivroDetalhe();
+  }, [modalDetalhes]);
 
   return (
     <div className="max-w-5xl mx-auto mt-8 bg-white p-6 rounded shadow">
@@ -185,21 +267,24 @@ export default function PainelEmprestimos() {
             onFocus={() => setIsDropdownUsuarioOpen(true)}
             autoComplete="off"
           />
-          {isDropdownUsuarioOpen && filtroUsuarioNome.length > 1 && usuariosFiltradosDropdown.length > 0 && (
+          {isDropdownUsuarioOpen && (filtroUsuarioNome.length === 0 || filtroUsuarioNome.length > 1) && usuariosFiltradosDropdown.length > 0 && (
             <ul className="border border-gray-300 rounded bg-white mt-1 max-h-32 overflow-y-auto z-10 absolute left-0 right-0">
-              {usuariosFiltradosDropdown.map(usuario => (
-                <li
-                  key={usuario}
-                  className={`px-2 py-1 cursor-pointer hover:bg-blue-100 ${filtroUsuario === String(usuario) ? 'bg-blue-200' : ''}`}
-                  onClick={() => {
-                    setFiltroUsuario(String(usuario));
-                    setFiltroUsuarioNome(usuario);
-                    setIsDropdownUsuarioOpen(false);
-                  }}
-                >
-                  {usuario}
-                </li>
-              ))}
+              {usuariosFiltradosDropdown.map(nome => {
+                const usuarioObj = usuariosUnicos.find(u => u.nome === nome);
+                return (
+                  <li
+                    key={usuarioObj?.id_usuario || nome}
+                    className={`px-2 py-1 cursor-pointer hover:bg-blue-100 ${filtroUsuarioNome === nome ? 'bg-blue-200' : ''}`}
+                    onClick={() => {
+                      setFiltroUsuarioNome(nome);
+                      if (usuarioObj) setFiltroUsuario(String(usuarioObj.id_usuario));
+                      setIsDropdownUsuarioOpen(false);
+                    }}
+                  >
+                    {nome}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
@@ -217,21 +302,24 @@ export default function PainelEmprestimos() {
             onFocus={() => setIsDropdownLivroOpen(true)}
             autoComplete="off"
           />
-          {isDropdownLivroOpen && filtroLivroTitulo.length > 1 && livrosFiltradosDropdown.length > 0 && (
+          {isDropdownLivroOpen && (filtroLivroTitulo.length === 0 || filtroLivroTitulo.length > 1) && livrosFiltradosDropdown.length > 0 && (
             <ul className="border border-gray-300 rounded bg-white mt-1 max-h-32 overflow-y-auto z-10 absolute left-0 right-0">
-              {livrosFiltradosDropdown.map(livro => (
-                <li
-                  key={livro}
-                  className={`px-2 py-1 cursor-pointer hover:bg-blue-100 ${filtroLivro === String(livro) ? 'bg-blue-200' : ''}`}
-                  onClick={() => {
-                    setFiltroLivro(String(livro));
-                    setFiltroLivroTitulo(livro);
-                    setIsDropdownLivroOpen(false);
-                  }}
-                >
-                  {livro}
-                </li>
-              ))}
+              {livrosFiltradosDropdown.map(titulo => {
+                const livroObj = livrosUnicos.find(l => l.titulo === titulo);
+                return (
+                  <li
+                    key={livroObj?.id_livro || titulo}
+                    className={`px-2 py-1 cursor-pointer hover:bg-blue-100 ${filtroLivroTitulo === titulo ? 'bg-blue-200' : ''}`}
+                    onClick={() => {
+                      setFiltroLivroTitulo(titulo);
+                      if (livroObj) setFiltroLivro(String(livroObj.id_livro));
+                      setIsDropdownLivroOpen(false);
+                    }}
+                  >
+                    {titulo}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
@@ -297,83 +385,22 @@ export default function PainelEmprestimos() {
             </ul>
           )}
         </div>
-        <div className="relative min-w-[180px]" ref={dropdownUsuarioFiltroRef}>
-          <input
-            type="text"
-            className="p-2 border border-gray-400 rounded w-full"
-            placeholder="Filtrar por usuário"
-            value={filtroUsuarioNome}
-            onChange={e => {
-              setFiltroUsuarioNome(e.target.value);
-              setDropdownUsuarioFiltroAberto(true);
-            }}
-            onFocus={() => setDropdownUsuarioFiltroAberto(true)}
-            autoComplete="off"
-          />
-          {dropdownUsuarioFiltroAberto && (filtroUsuarioNome.length === 0 || filtroUsuarioNome.length > 1) && usuariosFiltradosDropdown.length > 0 && (
-            <ul className="absolute left-0 right-0 border border-gray-300 rounded bg-white mt-1 max-h-40 overflow-y-auto z-20 shadow-lg">
-              {usuariosFiltradosDropdown.map(usuario => (
-                <li
-                  key={usuario}
-                  className="px-2 py-1 cursor-pointer hover:bg-blue-100"
-                  onMouseDown={e => e.preventDefault()}
-                  onClick={() => {
-                    setFiltroUsuarioNome(usuario);
-                    setDropdownUsuarioFiltroAberto(false);
-                  }}
-                >
-                  {usuario}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <div className="relative min-w-[180px]" ref={dropdownLivroFiltroRef}>
-          <input
-            type="text"
-            className="p-2 border border-gray-400 rounded w-full"
-            placeholder="Filtrar por livro"
-            value={filtroLivroTitulo}
-            onChange={e => {
-              setFiltroLivroTitulo(e.target.value);
-              setDropdownLivroFiltroAberto(true);
-            }}
-            onFocus={() => setDropdownLivroFiltroAberto(true)}
-            autoComplete="off"
-          />
-          {dropdownLivroFiltroAberto && (filtroLivroTitulo.length === 0 || filtroLivroTitulo.length > 1) && livrosFiltradosDropdown.length > 0 && (
-            <ul className="absolute left-0 right-0 border border-gray-300 rounded bg-white mt-1 max-h-40 overflow-y-auto z-20 shadow-lg">
-              {livrosFiltradosDropdown.map(livro => (
-                <li
-                  key={livro}
-                  className="px-2 py-1 cursor-pointer hover:bg-blue-100"
-                  onMouseDown={e => e.preventDefault()}
-                  onClick={() => {
-                    setFiltroLivroTitulo(livro);
-                    setDropdownLivroFiltroAberto(false);
-                  }}
-                >
-                  {livro}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
         <select
           className="p-2 border border-gray-400 rounded min-w-[180px]"
           value={filtroStatus}
           onChange={e => setFiltroStatus(e.target.value)}
         >
           <option value="">Todos os status</option>
-          <option value="Em andamento">Em andamento</option>
-          <option value="Devolvido">Devolvido</option>
+          <option value="ativo">Em andamento</option>
+          <option value="devolvido">Devolvido</option>
+          <option value="atrasado">Atrasado</option>
         </select>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full border border-gray-300 rounded">
           <thead className="bg-blue-100">
             <tr>
-              <th className="px-4 py-2 text-left">Livro</th>
+              <th className="px-4 py-2 text-left">Exemplar</th>
               <th className="px-4 py-2 text-left">Usuário</th>
               <th className="px-4 py-2 text-left">Data de Empréstimo</th>
               <th className="px-4 py-2 text-left">Data de Devolução</th>
@@ -383,18 +410,20 @@ export default function PainelEmprestimos() {
           </thead>
           <tbody>
             {filtrarEmprestimos().map(e => (
-              <tr key={e.id} className="border-t border-gray-200 hover:bg-gray-50">
-                <td className="px-4 py-2">{e.livro.titulo} <span className="text-xs text-gray-500">({e.livro.autor})</span></td>
-                <td className="px-4 py-2">{e.usuario.nome} <span className="text-xs text-gray-500">({e.usuario.tipo})</span></td>
-                <td className="px-4 py-2">{e.dataEmprestimo}</td>
-                <td className="px-4 py-2">{e.dataDevolucao || <span className="text-gray-400">—</span>}</td>
+              <tr key={e.id_emprestimo} className="border-t border-gray-200 hover:bg-gray-50">
+                <td className="px-4 py-2">{e.exemplar.codigo_identificacao}</td>
+                <td className="px-4 py-2">{e.usuario.nome}</td>
+                <td className="px-4 py-2">{e.data_retirada}</td>
+                <td className="px-4 py-2">{e.data_efetiva_devolucao || <span className="text-gray-400">—</span>}</td>
                 <td className="px-4 py-2">
                   <span className={
-                    e.status === "Em andamento"
+                    e.status_emprestimo === "ativo"
                       ? "bg-yellow-200 text-yellow-800 px-2 py-1 rounded text-xs"
-                      : "bg-green-200 text-green-800 px-2 py-1 rounded text-xs"
+                      : e.status_emprestimo === "devolvido"
+                      ? "bg-green-200 text-green-800 px-2 py-1 rounded text-xs"
+                      : "bg-red-200 text-red-800 px-2 py-1 rounded text-xs"
                   }>
-                    {e.status}
+                    {statusEmprestimoLabel(e.status_emprestimo)}
                   </span>
                 </td>
                 <td className="px-4 py-2 flex gap-2">
@@ -402,10 +431,10 @@ export default function PainelEmprestimos() {
                     className="px-3 py-1 bg-blue-700 text-white rounded hover:bg-blue-800 text-xs"
                     onClick={() => setModalDetalhes(e)}
                   >Detalhes</button>
-                  {e.status === "Em andamento" && (
+                  {e.status_emprestimo === "ativo" && (
                     <button
                       className="px-3 py-1 bg-green-700 text-white rounded hover:bg-green-800 text-xs"
-                      onClick={() => registrarDevolucao(e.id)}
+                      onClick={() => registrarDevolucao(e.id_emprestimo)}
                     >Registrar Devolução</button>
                   )}
                 </td>
@@ -424,11 +453,17 @@ export default function PainelEmprestimos() {
         <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
           <div className="bg-white rounded shadow-lg p-6 min-w-[320px] max-w-[90vw]">
             <h2 className="text-xl font-bold mb-2">Detalhes do Empréstimo</h2>
-            <div className="mb-2"><b>Livro:</b> {modalDetalhes.livro.titulo} ({modalDetalhes.livro.autor})</div>
-            <div className="mb-2"><b>Usuário:</b> {modalDetalhes.usuario.nome} ({modalDetalhes.usuario.tipo})</div>
-            <div className="mb-2"><b>Data de Empréstimo:</b> {modalDetalhes.dataEmprestimo}</div>
-            <div className="mb-2"><b>Data de Devolução:</b> {modalDetalhes.dataDevolucao || <span className="text-gray-400">—</span>}</div>
-            <div className="mb-2"><b>Status:</b> {modalDetalhes.status}</div>
+            <div className="mb-2"><b>Exemplar:</b> {modalDetalhes.exemplar.codigo_identificacao}</div>
+            {livroDetalhe && (
+              <>
+                <div className="mb-2"><b>Título do Livro:</b> {livroDetalhe.titulo}</div>
+                <div className="mb-2"><b>Autor(es):</b> {livroDetalhe.autores.join(", ")}</div>
+              </>
+            )}
+            <div className="mb-2"><b>Usuário:</b> {modalDetalhes.usuario.nome}</div>
+            <div className="mb-2"><b>Data de Empréstimo:</b> {modalDetalhes.data_retirada}</div>
+            <div className="mb-2"><b>Data de Devolução:</b> {modalDetalhes.data_efetiva_devolucao || <span className="text-gray-400">—</span>}</div>
+            <div className="mb-2"><b>Status:</b> {modalDetalhes.status_emprestimo}</div>
             <button
               className="mt-4 px-4 py-2 bg-blue-700 text-white rounded hover:bg-blue-800"
               onClick={() => setModalDetalhes(null)}
@@ -439,3 +474,5 @@ export default function PainelEmprestimos() {
     </div>
   );
 }
+
+export default withAuth(EmprestimosPage, ['funcionario']);

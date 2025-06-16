@@ -1,247 +1,343 @@
-// api.ts (Mock)
+// api.ts
 
 // --- Helper to get current date as YYYY-MM-DD ---
 function getCurrentDateString(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-// --- Interface definitions ---
-interface Livro {
-  id: number;
-  titulo: string;
-  autor: string;
-  categoria?: string;
-  // status?: 'disponivel' | 'emprestado' | 'reservado'; // Example for more detailed status
-}
-
-interface Usuario {
-  id: number;
+// --- Autor/Categoria/Cursos ---
+export interface AutorReadBasic {
+  id_autor: number;
   nome: string;
-  tipo: string; // e.g., 'aluno', 'professor', 'Funcionário'
+  ano_nasc?: number | null;
 }
 
-interface Reserva {
-  id: number;
-  livro: Livro; // Nested Livro object
-  usuario: Usuario; // Nested Usuario object
-  dataReserva: string; // YYYY-MM-DD
-  status: "Ativa" | "Cancelada" | "Efetivada";
+export interface CategoriaReadBasic {
+  id_categoria: number;
+  nome: string;
 }
 
-interface Emprestimo {
-  id: number;
-  livro: Livro; // Nested Livro object
-  usuario: Usuario; // Nested Usuario object
-  dataEmprestimo: string; // YYYY-MM-DD
-  dataDevolucao: string | null; // YYYY-MM-DD or null
-  status: "Em andamento" | "Devolvido";
+export interface CursoReadBasic {
+  id_curso: number;
+  nome: string;
+  departamento?: string | null;
 }
 
-// --- Mock Data ---
-const mockLivros: Livro[] = [
-  { id: 1, titulo: "O Senhor dos Anéis", autor: "J.R.R. Tolkien", categoria: "Fantasia" },
-  { id: 2, titulo: "1984", autor: "George Orwell", categoria: "Distopia" },
-  { id: 3, titulo: "Dom Quixote", autor: "Miguel de Cervantes", categoria: "Clássico" },
-  { id: 4, titulo: "A Revolução dos Bichos", autor: "George Orwell", categoria: "Sátira Política" },
-  { id: 5, titulo: "O Pequeno Príncipe", autor: "Antoine de Saint-Exupéry", categoria: "Infantil" },
-  { id: 6, titulo: "Orgulho e Preconceito", autor: "Jane Austen", categoria: "Romance" },
-  { id: 7, titulo: "Cem Anos de Solidão", autor: "Gabriel García Márquez", categoria: "Realismo Mágico" },
-  { id: 8, titulo: "O Hobbit", autor: "J.R.R. Tolkien", categoria: "Fantasia" },
-  { id: 9, titulo: "Fahrenheit 451", autor: "Ray Bradbury", categoria: "Ficção Científica" },
-  { id: 10, titulo: "Moby Dick", autor: "Herman Melville", categoria: "Aventura" },
-  { id: 11, titulo: "Guerra e Paz", autor: "Liev Tolstói", categoria: "Histórico" },
-  { id: 12, titulo: "O Apanhador no Campo de Centeio", autor: "J.D. Salinger", categoria: "Ficção" },
-];
+// --- Livro ---
+export interface LivroReadBasic {
+  id_livro: number;
+  titulo: string;
+  ano_publicacao?: number | null;
+  status_geral?: string | null;
+  id_categoria: number;
+}
 
-const mockUsuarios: Usuario[] = [
-  { id: 101, nome: "Ana Silva", tipo: "Aluno" },
-  { id: 102, nome: "Carlos Souza", tipo: "Professor" },
-  { id: 103, nome: "Beatriz Lima", tipo: "Aluno" },
-  { id: 104, nome: "Daniel Costa", tipo: "Funcionário" },
-  { id: 105, nome: "Fernanda Alves", tipo: "Aluno" },
-  { id: 106, nome: "Ricardo Borges", tipo: "Professor" },
-];
+export interface LivroRead {
+  id_livro: number;
+  titulo: string;
+  ano_publicacao?: number | null;
+  status_geral?: string | null;
+  id_categoria: number;
+  categoria: CategoriaReadBasic;
+  autores: AutorReadBasic[];
+}
 
-let mockReservas: Reserva[] = [
-  { id: 201, livro: mockLivros[0], usuario: mockUsuarios[0], dataReserva: "2025-05-10", status: "Ativa" },
-  { id: 202, livro: mockLivros[2], usuario: mockUsuarios[1], dataReserva: "2025-05-12", status: "Efetivada" },
-  { id: 203, livro: mockLivros[4], usuario: mockUsuarios[0], dataReserva: "2025-04-20", status: "Cancelada" },
-];
+// --- Usuario ---
+export interface UsuarioReadBasic {
+  id_usuario: number;
+  nome: string;
+  telefone?: string | null;
+  matricula: string;
+  email?: string | null;
+  id_curso?: number | null;
+  is_active: boolean;
+  curso?: CursoReadBasic | null;
+  role?: string; // O backend envia 'role' no token, não 'tipo'
+}
 
-let mockEmprestimos: Emprestimo[] = [
-  { id: 301, livro: mockLivros[1], usuario: mockUsuarios[2], dataEmprestimo: "2025-05-01", dataDevolucao: null, status: "Em andamento" },
-  { id: 302, livro: mockLivros[3], usuario: mockUsuarios[3], dataEmprestimo: "2025-04-15", dataDevolucao: "2025-05-15", status: "Devolvido" },
-  { id: 303, livro: mockLivros[5], usuario: mockUsuarios[1], dataEmprestimo: "2025-05-05", dataDevolucao: null, status: "Em andamento" },
-];
+export interface UsuarioRead extends UsuarioReadBasic {
+  // id_usuario, nome, etc. herdados
+  // curso?: CursoReadBasic | null;
+}
 
-// Simple ID generators
-let nextLivroId = mockLivros.length > 0 ? Math.max(...mockLivros.map(l => l.id)) + 1 : 1;
-let nextUsuarioId = mockUsuarios.length > 0 ? Math.max(...mockUsuarios.map(u => u.id)) + 1 : 101;
-let nextReservaId = mockReservas.length > 0 ? Math.max(...mockReservas.map(r => r.id)) + 1 : 201;
-let nextEmprestimoId = mockEmprestimos.length > 0 ? Math.max(...mockEmprestimos.map(e => e.id)) + 1 : 301;
+// --- Exemplar ---
+export interface ExemplarReadBasic {
+  id_exemplar: number;
+  codigo_identificacao: string;
+  status: string;
+  data_aquisicao?: string | null;
+  observacoes?: string | null;
+  id_livro: number;
+}
 
+// --- Funcionario ---
+export interface FuncionarioReadBasic {
+  id_funcionario: number;
+  nome: string;
+  cargo: string;
+  matricula_funcional: string;
+  is_active: boolean;
+}
 
-// --- API Mock Implementation ---
+// --- Reserva ---
+export interface ReservaRead {
+  id_reserva: number;
+  data_reserva: string;
+  data_validade_reserva: string;
+  status: string;
+  id_exemplar?: number | null;
+  id_livro_solicitado?: number | null;
+  id_usuario: number;
+  id_funcionario_registro?: number | null;
+  usuario: UsuarioReadBasic;
+  exemplar?: ExemplarReadBasic | null;
+  livro?: LivroRead | null; // livro é populado com autores/categoria
+  funcionario_registro_reserva?: FuncionarioReadBasic | null;
+}
+
+// --- Emprestimo ---
+export interface EmprestimoRead {
+  id_emprestimo: number;
+  data_retirada: string;
+  data_prevista_devolucao: string;
+  data_efetiva_devolucao?: string | null;
+  status_emprestimo: string;
+  id_usuario: number;
+  id_exemplar: number;
+  id_funcionario_registro: number;
+  usuario: UsuarioReadBasic;
+  exemplar: ExemplarReadBasic;
+  funcionario_registro_emprestimo: FuncionarioReadBasic;
+}
+
+// --- Token ---
+export interface TokenResponse {
+  access_token: string;
+  token_type: string;
+}
+
+// --- Constantes e helpers ---
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+const TOKEN_KEY = "bibliodex_access_token";
+const REFRESH_TOKEN_KEY = "bibliodex_refresh_token";
+
+const getAuthToken = (): string | null => {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem(TOKEN_KEY);
+  }
+  return null;
+};
+
+const getRefreshToken = (): string | null => {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem(REFRESH_TOKEN_KEY);
+  }
+  return null;
+};
+
+const setTokens = (accessToken: string, refreshToken: string) => {
+  localStorage.setItem(TOKEN_KEY, accessToken);
+  localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+};
+
+const clearTokens = () => {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+};
+
+// --- Função para tentar renovar o access_token automaticamente ---
+const tryRefreshToken = async (): Promise<boolean> => {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return false;
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/refresh_token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+    if (!response.ok) return false;
+    const data = await response.json();
+    if (data.access_token && data.refresh_token) {
+      setTokens(data.access_token, data.refresh_token);
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+};
+
+// --- Wrapper para lidar com 401 e tentar refresh ---
+async function fetchWithAutoRefresh(input: RequestInfo, init?: RequestInit, retry = true): Promise<Response> {
+  let response = await fetch(input, init);
+  if (response.status === 401 && retry) {
+    // Tenta renovar o token
+    const refreshed = await tryRefreshToken();
+    if (refreshed) {
+      // Reenvia a requisição original com novo token
+      const token = getAuthToken();
+      if (token) {
+        const headers = new Headers(init?.headers || {});
+        headers.set("Authorization", `Bearer ${token}`);
+        response = await fetch(input, { ...init, headers });
+        if (response.status !== 401) return response;
+      }
+    }
+    // Se não conseguiu renovar, limpa tokens e redireciona para login
+    clearTokens();
+    if (typeof window !== "undefined" && !window.location.pathname.endsWith('/login')) {
+      window.location.href = '/login';
+    }
+  }
+  return response;
+}
+
+const handleApiError = async (response: Response, url: string) => {
+  let errorMessage = "Ocorreu um erro desconhecido";
+  let status = response.status;
+  let data: any = null;
+  try {
+    data = await response.json();
+    errorMessage = data.detail || data.message || errorMessage;
+  } catch {
+    // ignore
+  }
+  if (status === 401) {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(TOKEN_KEY);
+      if (!window.location.pathname.endsWith('/login')) {
+        window.location.href = '/login';
+      }
+    }
+  }
+  const err = new Error(errorMessage);
+  (err as any).status = status;
+  (err as any).data = data;
+  throw err;
+};
+
+// --- API methods usando fetchWithAutoRefresh ---
 const api = {
-  get: <T>(url: string, params?: any): Promise<{ data: T }> => {
-    console.log(`[MOCK API] GET: ${url}`, params);
-    return new Promise((resolve, reject) => {
-      setTimeout(() => { // Simulate network delay
-        // Handle /livros and /api/livros
-        if (url.startsWith('/livros') || url.startsWith('/api/livros')) {
-          if (url.endsWith('/') || url === '/api/livros') { // Ends with / or is exactly /api/livros
-            resolve({ data: mockLivros as any });
-          } else if (url.includes('?titulo=')) {
-            const tituloQuery = url.split('?titulo=')[1].toLowerCase();
-            const filteredLivros = mockLivros.filter(livro =>
-              livro.titulo.toLowerCase().includes(tituloQuery)
-            );
-            resolve({ data: filteredLivros as any });
-          } else {
-            resolve({ data: mockLivros as any }); // Fallback
-          }
-        // Handle /usuarios and /api/usuarios
-        } else if (url.startsWith('/usuarios') || url.startsWith('/api/usuarios')) {
-          if (url.endsWith('/') || url === '/api/usuarios') { // Ends with / or is exactly /api/usuarios
-            resolve({ data: mockUsuarios as any });
-          } else if (url.includes('?nome=')) {
-            const nomeQuery = url.split('?nome=')[1].toLowerCase();
-            const filteredUsuarios = mockUsuarios.filter(usuario =>
-              usuario.nome.toLowerCase().includes(nomeQuery)
-            );
-            resolve({ data: filteredUsuarios as any });
-          } else {
-            resolve({ data: mockUsuarios as any }); // Fallback
-          }
-        // Handle /api/reservas
-        } else if (url === '/api/reservas') {
-          resolve({ data: mockReservas as any });
-        // Handle /api/emprestimos
-        } else if (url === '/api/emprestimos') {
-          resolve({ data: mockEmprestimos as any });
-        }
-        else {
-          console.error(`[MOCK API] Unhandled GET request for URL: ${url}`);
-          reject(new Error(`Mock API: No handler for GET ${url}`));
-        }
-      }, 300); // 300ms delay
-    });
+  get: async <T>(url: string, params?: any): Promise<{ data: T }> => {
+    const token = getAuthToken();
+    let fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+    if (params && typeof params === 'object') {
+      const qs = new URLSearchParams(params).toString();
+      fullUrl += (fullUrl.includes('?') ? '&' : '?') + qs;
+    }
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const response = await fetchWithAutoRefresh(fullUrl, { headers });
+    if (!response.ok) {
+      await handleApiError(response, fullUrl);
+    }
+    const data = await response.json();
+    return { data };
   },
 
-  post: <T>(url: string, body: any): Promise<{ data: T }> => {
-    console.log(`[MOCK API] POST: ${url}`, body);
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (url === '/api/reservas' || url === '/reservas') { // Handle old and new path for reservations
-          const { livroId, usuarioId } = body;
-          const livro = mockLivros.find(l => l.id === Number(livroId));
-          const usuario = mockUsuarios.find(u => u.id === Number(usuarioId));
-
-          if (!livro || !usuario) {
-            console.error(`[MOCK API] POST /api/reservas: Livro ou Usuário não encontrado. LivroID: ${livroId}, UsuarioID: ${usuarioId}`);
-            return reject(new Error('Livro ou Usuário não encontrado'));
-          }
-          const novaReserva: Reserva = {
-            id: nextReservaId++,
-            livro,
-            usuario,
-            dataReserva: getCurrentDateString(),
-            status: "Ativa",
-          };
-          mockReservas.push(novaReserva);
-          console.log('[MOCK API] Nova reserva criada:', novaReserva);
-          resolve({ data: novaReserva as any });
-
-        } else if (url === '/api/emprestimos' || url === '/emprestimos') { // Handle old and new path for loans
-          const { livroId, usuarioId } = body;
-          const livro = mockLivros.find(l => l.id === Number(livroId));
-          const usuario = mockUsuarios.find(u => u.id === Number(usuarioId));
-
-          if (!livro || !usuario) {
-            console.error(`[MOCK API] POST /api/emprestimos: Livro ou Usuário não encontrado. LivroID: ${livroId}, UsuarioID: ${usuarioId}`);
-            return reject(new Error('Livro ou Usuário não encontrado'));
-          }
-          const novoEmprestimo: Emprestimo = {
-            id: nextEmprestimoId++,
-            livro,
-            usuario,
-            dataEmprestimo: getCurrentDateString(),
-            dataDevolucao: null,
-            status: "Em andamento",
-          };
-          mockEmprestimos.push(novoEmprestimo);
-          console.log('[MOCK API] Novo empréstimo criado:', novoEmprestimo);
-          resolve({ data: novoEmprestimo as any });
-        } else {
-          console.error(`[MOCK API] Unhandled POST request for URL: ${url}`);
-          reject(new Error(`Mock API: No handler for POST ${url}`));
-        }
-      }, 300);
+  post: async <T>(url: string, body: any): Promise<{ data: T }> => {
+    const token = getAuthToken();
+    const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+    // Corrigir headers para envio de form-data no login
+    if (url.endsWith('/auth/token') && body instanceof URLSearchParams) {
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const response = await fetch(fullUrl, {
+        method: 'POST',
+        body,
+        headers,
+      });
+      if (!response.ok) {
+        await handleApiError(response, fullUrl);
+      }
+      const data = await response.json();
+      // Salva access_token e refresh_token se presentes
+      if (data.access_token && data.refresh_token) {
+        setTokens(data.access_token, data.refresh_token);
+      }
+      return { data };
+    }
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const response = await fetchWithAutoRefresh(fullUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
     });
+    if (!response.ok) {
+      await handleApiError(response, fullUrl);
+    }
+    const data = await response.json();
+    // Salva access_token e refresh_token se presentes (ex: refresh endpoint)
+    if (data.access_token && data.refresh_token) {
+      setTokens(data.access_token, data.refresh_token);
+    }
+    return { data };
   },
 
-  put: <T>(url: string, body: any): Promise<{ data: T }> => {
-    console.log(`[MOCK API] PUT: ${url}`, body);
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const parts = url.split('/');
-        const id = parseInt(parts[parts.length - 1]);
-
-        if (url.startsWith('/api/reservas/')) {
-          const reservaIndex = mockReservas.findIndex(r => r.id === id);
-          if (reservaIndex !== -1) {
-            // Example: updating status for cancellation
-            if (body.status === "Cancelada" && mockReservas[reservaIndex].status === "Ativa") {
-              mockReservas[reservaIndex] = { ...mockReservas[reservaIndex], status: "Cancelada" };
-              console.log('[MOCK API] Reserva atualizada:', mockReservas[reservaIndex]);
-              resolve({ data: mockReservas[reservaIndex] as any });
-            } else if (body.status) { // Generic status update
-               mockReservas[reservaIndex] = { ...mockReservas[reservaIndex], ...body };
-               console.log('[MOCK API] Reserva atualizada:', mockReservas[reservaIndex]);
-               resolve({ data: mockReservas[reservaIndex] as any });
-            }
-            else {
-              console.warn(`[MOCK API] PUT /api/reservas/${id}: Update not applicable or no changes provided. Current status: ${mockReservas[reservaIndex].status}`);
-              resolve({ data: mockReservas[reservaIndex] as any }); // Or reject if strict
-            }
-          } else {
-            console.error(`[MOCK API] PUT /api/reservas/${id}: Reserva não encontrada.`);
-            reject(new Error('Reserva não encontrada'));
-          }
-        } else if (url.startsWith('/api/emprestimos/')) {
-          const emprestimoIndex = mockEmprestimos.findIndex(e => e.id === id);
-          if (emprestimoIndex !== -1) {
-            // Example: registering return
-            if (body.status === "Devolvido" && mockEmprestimos[emprestimoIndex].status === "Em andamento") {
-              mockEmprestimos[emprestimoIndex] = {
-                ...mockEmprestimos[emprestimoIndex],
-                status: "Devolvido",
-                dataDevolucao: body.dataDevolucao || getCurrentDateString(),
-              };
-              console.log('[MOCK API] Empréstimo atualizado:', mockEmprestimos[emprestimoIndex]);
-              resolve({ data: mockEmprestimos[emprestimoIndex] as any });
-            } else if (body.status) { // Generic status update
-                mockEmprestimos[emprestimoIndex] = { ...mockEmprestimos[emprestimoIndex], ...body };
-                console.log('[MOCK API] Empréstimo atualizado:', mockEmprestimos[emprestimoIndex]);
-                resolve({ data: mockEmprestimos[emprestimoIndex] as any });
-            }
-            else {
-              console.warn(`[MOCK API] PUT /api/emprestimos/${id}: Update not applicable or no changes provided. Current status: ${mockEmprestimos[emprestimoIndex].status}`);
-              resolve({ data: mockEmprestimos[emprestimoIndex] as any }); // Or reject
-            }
-          } else {
-            console.error(`[MOCK API] PUT /api/emprestimos/${id}: Empréstimo não encontrado.`);
-            reject(new Error('Empréstimo não encontrado'));
-          }
-        } else {
-          console.error(`[MOCK API] Unhandled PUT request for URL: ${url}`);
-          reject(new Error(`Mock API: No handler for PUT ${url}`));
-        }
-      }, 300);
+  put: async <T>(url: string, body: any): Promise<{ data: T }> => {
+    const token = getAuthToken();
+    const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const response = await fetchWithAutoRefresh(fullUrl, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(body),
     });
+    if (!response.ok) {
+      await handleApiError(response, fullUrl);
+    }
+    const data = await response.json();
+    return { data };
   },
-  // You can add mock implementations for delete, etc. if your component uses them
-  // delete: <T>(url: string): Promise<{ data: T }> => { ... },
+
+  delete: async <T>(url: string): Promise<{ data: T }> => {
+    const token = getAuthToken();
+    const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const response = await fetchWithAutoRefresh(fullUrl, {
+      method: 'DELETE',
+      headers,
+    });
+    if (!response.ok) {
+      await handleApiError(response, fullUrl);
+    }
+    const data = await response.json();
+    return { data };
+  },
+};
+
+// Exemplo de função para buscar livros paginados/filtrados
+export async function fetchLivros(params: {
+  skip?: number;
+  limit?: number;
+  titulo?: string;
+  autor?: string;
+  categoria_id?: number;
+  sort_by?: string;
+  sort_dir?: string;
+}) {
+  return api.get<LivroRead[]>("/livros", params);
+}
+
+// Exemplo de função para buscar usuários por nome (autocomplete)
+export async function fetchUsuariosAutocomplete(params: {
+  nome_like: string;
+  limit?: number;
+}) {
+  return api.get<UsuarioReadBasic[]>("/usuarios", params);
+}
+
+export {
+  TOKEN_KEY,
+  REFRESH_TOKEN_KEY,
+  getAuthToken,
+  getRefreshToken,
+  API_BASE_URL,
+  setTokens,
+  clearTokens,
 };
 
 export default api;

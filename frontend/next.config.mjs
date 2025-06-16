@@ -1,13 +1,6 @@
-docker-compose up --build -d/** @type {import('next').NextConfig} */
+/** @type {import('next').NextConfig} */
 const nextConfig = {
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: 'http://localhost:8000/:path*',
-      },
-    ];
-  },
+  output: 'standalone', // Important for Docker builds with output file tracing
 };
 
 export default nextConfig;

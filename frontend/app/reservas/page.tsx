@@ -1,30 +1,28 @@
 "use client";
-import * as React from "react";
-import { useState, useEffect } from "react";
+import * as React from "react"; // Import React
+import { useState, useEffect, useRef } from "react"; // Import hooks
+import api, { ReservaRead as Reserva, UsuarioReadBasic as User, LivroRead as Livro } from "../api"; // Corrija os tipos importados
+import { useAuth } from "../contexts/AuthContext"; // Import useAuth
+import withAuth from "../components/withAuth"; // Import withAuth
 
-interface Reserva {
-  id: number;
-  livro: { id: number; titulo: string; autor: string; categoria?: string };
-  usuario: { id: number; nome: string; tipo: string };
-  dataReserva: string;
-  status: "Ativa" | "Cancelada" | "Efetivada";
-}
-
-export default function Reservas() {
+function ReservasPage() {
+  const { user: authUser } = useAuth(); // Get authenticated user info
   const [reservas, setReservas] = useState<Reserva[]>([]);
-  const [usuarios, setUsuarios] = useState<{ id: number; nome: string; tipo: string }[]>([]);
-  const [livros, setLivros] = useState<{ id: number; titulo: string; autor: string }[]>([]);
-  const [filtroUsuario, setFiltroUsuario] = useState("");
-  const [filtroLivro, setFiltroLivro] = useState("");
+  const [usuarios, setUsuarios] = useState<User[]>([]);
+  const [livros, setLivros] = useState<Livro[]>([]);
+  const [filtroUsuario, setFiltroUsuario] = useState(""); // ID do usuário
+  const [filtroLivro, setFiltroLivro] = useState(""); // ID do livro
+  const [filtroAutor, setFiltroAutor] = React.useState(""); // Nome do autor
+  const [filtroCategoria, setFiltroCategoria] = React.useState(""); // Nome da categoria
   const [filtroStatus, setFiltroStatus] = useState("");
   const [modalNova, setModalNova] = useState(false);
   const [livroId, setLivroId] = useState("");
   const [usuarioId, setUsuarioId] = useState("");
   const [mensagem, setMensagem] = useState("");
   const [buscaUsuarioModal, setBuscaUsuarioModal] = useState("");
-  const [usuariosFiltradosModal, setUsuariosFiltradosModal] = useState<{id:number, nome:string, tipo:string}[]>([]);
+  const [usuariosFiltradosModal, setUsuariosFiltradosModal] = useState<User[]>([]);
   const [buscaLivroModal, setBuscaLivroModal] = useState("");
-  const [livrosFiltradosModal, setLivrosFiltradosModal] = useState<{id:number, titulo:string, autor:string}[]>([]);
+  const [livrosFiltradosModal, setLivrosFiltradosModal] = useState<Livro[]>([]);
 
   // Estados e refs para dropdowns dos filtros
   const [isDropdownUsuarioOpen, setIsDropdownUsuarioOpen] = useState(false);
@@ -44,8 +42,6 @@ export default function Reservas() {
   const dropdownCategoriaFiltroRef = React.useRef<HTMLDivElement>(null);
   const [autoresFiltradosDropdown, setAutoresFiltradosDropdown] = React.useState<string[]>([]);
   const [categoriasFiltradasDropdown, setCategoriasFiltradasDropdown] = React.useState<string[]>([]);
-  const [filtroAutor, setFiltroAutor] = React.useState("");
-  const [filtroCategoria, setFiltroCategoria] = React.useState("");
 
   // Dropdowns para usuário e livro (filtros)
   const [dropdownUsuarioFiltroAberto, setDropdownUsuarioFiltroAberto] = React.useState(false);
@@ -58,12 +54,42 @@ export default function Reservas() {
   const [filtroLivroTitulo, setFiltroLivroTitulo] = React.useState("");
 
   // Gerar listas únicas de autores/categorias
-  const autoresUnicos = React.useMemo(() => Array.from(new Set(reservas.map(r => r.livro.autor))).sort(), [reservas]);
-  const categoriasUnicos = React.useMemo(() => Array.from(new Set(reservas.map(r => r.livro.categoria).filter(Boolean))).sort(), [reservas]);
+  const autoresUnicos = React.useMemo(
+    () =>
+      Array.from(
+        new Set(
+          reservas
+            .map((r) =>
+              Array.isArray(r.livro?.autores)
+                ? r.livro.autores.map((a) => a.nome)
+                : []
+            )
+            .flat()
+        )
+      ).sort(),
+    [reservas]
+  );
+  const categoriasUnicos = React.useMemo(
+    () =>
+      Array.from(
+        new Set(
+          reservas
+            .map((r) => r.livro?.categoria?.nome)
+            .filter(Boolean)
+        )
+      ).sort(),
+    [reservas]
+  );
 
   // Gerar listas únicas de usuários/livros
   const usuariosUnicos = React.useMemo(() => Array.from(new Set(reservas.map(r => r.usuario.nome))).sort(), [reservas]);
-  const livrosUnicos = React.useMemo(() => Array.from(new Set(reservas.map(r => r.livro.titulo))).sort(), [reservas]);
+  const livrosUnicos = React.useMemo(
+    () =>
+      Array.from(
+        new Set(reservas.map((r) => r.livro?.titulo).filter(Boolean))
+      ).sort(),
+    [reservas]
+  );
 
   // Atualizar dropdown de autores
   React.useEffect(() => {
@@ -143,70 +169,142 @@ export default function Reservas() {
 
   useEffect(() => {
     async function fetchData() {
+      if (!authUser) return; 
+
       try {
-        const [reservasRes, usuariosRes, livrosRes] = await Promise.all([
-          fetch("/api/reservas"),
-          fetch("/api/usuarios"),
-          fetch("/api/livros"),
-        ]);
-        const [reservasData, usuariosData, livrosData] = await Promise.all([
-          reservasRes.json(),
-          usuariosRes.json(),
-          livrosRes.json(),
-        ]);
-        setReservas(reservasData);
-        setUsuarios(usuariosData);
-        setLivros(livrosData);
+        // Use correct paths without /api prefix
+        const reservasRes = await api.get<Reserva[]>("/reservas");
+        setReservas(reservasRes.data);
+
+        const usuariosRes = await api.get<User[]>("/usuarios");
+        setUsuarios(usuariosRes.data);
+
+        const livrosRes = await api.get<Livro[]>("/livros");
+        setLivros(livrosRes.data);
+
       } catch (error) {
         console.error("Erro ao buscar dados:", error);
+        setMensagem("Falha ao carregar dados. Tente novamente.");
       }
     }
     fetchData();
-  }, []);
+  }, [authUser]); 
+
+  // Update modal user search
+  useEffect(() => {
+    if (buscaUsuarioModal.length > 1) {
+      // Simulating client-side filter as API mock might not support query for all users
+      setUsuariosFiltradosModal(
+        usuarios.filter(u => u.nome.toLowerCase().includes(buscaUsuarioModal.toLowerCase()))
+      );
+    } else {
+      setUsuariosFiltradosModal([]);
+    }
+  }, [buscaUsuarioModal, usuarios]);
+
+  // Update modal livro search
+  useEffect(() => {
+    if (buscaLivroModal.length > 1) {
+      setLivrosFiltradosModal(
+        livros.filter(l => l.titulo.toLowerCase().includes(buscaLivroModal.toLowerCase()))
+      );
+    } else {
+      setLivrosFiltradosModal([]);
+    }
+  }, [buscaLivroModal, livros]);
+
+
+  // Mapeamento de status do backend para exibição amigável
+  function statusReservaLabel(status: string) {
+    switch (status) {
+      case "ativa":
+        return "Ativa";
+      case "cancelada":
+        return "Cancelada";
+      case "expirada":
+        return "Expirada";
+      case "atendida":
+        return "Efetivada";
+      default:
+        return status;
+    }
+  }
 
   function filtrarReservas() {
     return reservas.filter(r =>
-      (!filtroUsuario || String(r.usuario.id) === filtroUsuario) &&
-      (!filtroLivro || String(r.livro.id) === filtroLivro) &&
+      (!filtroUsuario || String(r.usuario.id_usuario) === filtroUsuario) &&
+      (!filtroLivro || (r.livro && String(r.livro.id_livro) === filtroLivro)) &&
       (!filtroStatus || r.status === filtroStatus) &&
-      (!filtroAutor || r.livro.autor === filtroAutor) &&
-      (!filtroCategoria || r.livro.categoria === filtroCategoria)
+      (!filtroAutor ||
+        (r.livro &&
+          Array.isArray(r.livro.autores) &&
+          r.livro.autores.some((a: any) =>
+            a.nome.toLowerCase().includes(filtroAutor.toLowerCase())
+          ))
+      ) &&
+      (!filtroCategoria ||
+        (r.livro &&
+          r.livro.categoria &&
+          r.livro.categoria.nome.toLowerCase().includes(filtroCategoria.toLowerCase()))
+      )
     );
   }
 
-  function criarReserva(e: React.FormEvent) {
+  async function criarReserva(e: React.FormEvent) {
     e.preventDefault();
     if (!livroId || !usuarioId) {
       setMensagem("Selecione o livro e o usuário.");
       return;
     }
-    setReservas(rs => [
-      ...rs,
-      {
-        id: rs.length + 1,
-        livro: livros.find(l => String(l.id) === livroId)!,
-        usuario: usuarios.find(u => String(u.id) === usuarioId)!,
-        dataReserva: new Date().toISOString().slice(0, 10),
-        status: "Ativa",
-      },
-    ]);
-    setMensagem("Reserva criada com sucesso!");
-    setTimeout(() => {
-      setModalNova(false);
-      setMensagem("");
-      setLivroId("");
-      setUsuarioId("");
-    }, 1200);
+    try {
+      // Calcule as datas conforme a regra de negócio (exemplo: validade = hoje + 3 dias)
+      const hoje = new Date();
+      const data_reserva = hoje.toISOString().slice(0, 10);
+      const data_validade_reserva = new Date(hoje.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+      const novaReservaPayload = {
+        id_livro_solicitado: parseInt(livroId),
+        id_usuario: parseInt(usuarioId),
+        data_reserva,
+        data_validade_reserva,
+        // status: "ativa" // opcional, backend já define default
+      };
+      const response = await api.post<Reserva>('/reservas', novaReservaPayload);
+      setReservas(rs => [...rs, response.data]);
+      setMensagem("Reserva criada com sucesso!");
+      setTimeout(() => {
+        setModalNova(false);
+        setMensagem("");
+        setLivroId("");
+        setUsuarioId("");
+        setBuscaLivroModal("");
+        setBuscaUsuarioModal("");
+      }, 1200);
+    } catch (error) {
+      console.error("Erro ao criar reserva:", error);
+      setMensagem("Falha ao criar reserva.");
+    }
   }
 
-  function cancelarReserva(id: number) {
-    setReservas(rs =>
-      rs.map(r =>
-        r.id === id && r.status === "Ativa"
-          ? { ...r, status: "Cancelada" }
-          : r
-      )
-    );
+  async function cancelarReserva(id: number, isCliente: boolean = false) {
+    try {
+      if (isCliente) {
+        // Usuário comum cancela sua própria reserva via endpoint específico
+        await api.put(`/reservas/${id}/cancelar`, {});
+        setReservas(rs => rs.map(r => r.id_reserva === id ? { ...r, status: "cancelada" } : r));
+        setMensagem("Reserva cancelada.");
+        setTimeout(() => setMensagem(""), 2000);
+      } else {
+        // Funcionário pode excluir/cancelar diretamente
+        await api.delete(`/reservas/${id}`);
+        setReservas(rs => rs.filter(r => r.id_reserva !== id));
+        setMensagem("Reserva cancelada.");
+        setTimeout(() => setMensagem(""), 2000);
+      }
+    } catch (error) {
+      console.error("Erro ao cancelar reserva:", error);
+      setMensagem("Falha ao cancelar reserva.");
+    }
   }
 
   return (
@@ -226,19 +324,23 @@ export default function Reservas() {
             onFocus={() => setDropdownUsuarioFiltroAberto(true)}
             autoComplete="off"
           />
-          {dropdownUsuarioFiltroAberto && (filtroUsuarioNome.length === 0 || filtroUsuarioNome.length > 1) && usuariosFiltradosDropdown.length > 0 && (
+           {/* Dropdown para filtroUsuarioNome */}
+           {dropdownUsuarioFiltroAberto && (filtroUsuarioNome.length === 0 || filtroUsuarioNome.length > 1) && usuariosFiltradosDropdown.length > 0 && (
             <ul className="absolute left-0 right-0 border border-gray-300 rounded bg-white mt-1 max-h-40 overflow-y-auto z-20 shadow-lg">
-              {usuariosFiltradosDropdown.map(usuario => (
+              {usuariosFiltradosDropdown.map(nome => (
                 <li
-                  key={usuario}
+                  key={nome}
                   className="px-2 py-1 cursor-pointer hover:bg-blue-100"
                   onMouseDown={e => e.preventDefault()}
                   onClick={() => {
-                    setFiltroUsuarioNome(usuario);
+                    setFiltroUsuarioNome(nome);
+                    // Encontrar o ID do usuário correspondente ao nome selecionado para filtroUsuario
+                    const usuarioSelecionado = usuarios.find(u => u.nome === nome);
+                    if (usuarioSelecionado) setFiltroUsuario(String(usuarioSelecionado.id_usuario));
                     setDropdownUsuarioFiltroAberto(false);
                   }}
                 >
-                  {usuario}
+                  {nome}
                 </li>
               ))}
             </ul>
@@ -257,19 +359,22 @@ export default function Reservas() {
             onFocus={() => setDropdownLivroFiltroAberto(true)}
             autoComplete="off"
           />
+          {/* Dropdown para filtroLivroTitulo */}
           {dropdownLivroFiltroAberto && (filtroLivroTitulo.length === 0 || filtroLivroTitulo.length > 1) && livrosFiltradosDropdown.length > 0 && (
             <ul className="absolute left-0 right-0 border border-gray-300 rounded bg-white mt-1 max-h-40 overflow-y-auto z-20 shadow-lg">
-              {livrosFiltradosDropdown.map(livro => (
+              {livrosFiltradosDropdown.map(titulo => (
                 <li
-                  key={livro}
+                  key={titulo}
                   className="px-2 py-1 cursor-pointer hover:bg-blue-100"
                   onMouseDown={e => e.preventDefault()}
                   onClick={() => {
-                    setFiltroLivroTitulo(livro);
+                    setFiltroLivroTitulo(titulo);
+                     const livroSelecionado = livros.find(l => l.titulo === titulo);
+                    if (livroSelecionado) setFiltroLivro(String(livroSelecionado.id_livro));
                     setDropdownLivroFiltroAberto(false);
                   }}
                 >
-                  {livro}
+                  {titulo}
                 </li>
               ))}
             </ul>
@@ -288,7 +393,8 @@ export default function Reservas() {
             onFocus={() => setDropdownAutorFiltroAberto(true)}
             autoComplete="off"
           />
-          {dropdownAutorFiltroAberto && (filtroAutor.length === 0 || filtroAutor.length > 1) && autoresFiltradosDropdown.length > 0 && (
+           {/* Dropdown para filtroAutor */}
+           {dropdownAutorFiltroAberto && (filtroAutor.length === 0 || filtroAutor.length > 1) && autoresFiltradosDropdown.length > 0 && (
             <ul className="absolute left-0 right-0 border border-gray-300 rounded bg-white mt-1 max-h-40 overflow-y-auto z-20 shadow-lg">
               {autoresFiltradosDropdown.map(autor => (
                 <li
@@ -319,6 +425,7 @@ export default function Reservas() {
             onFocus={() => setDropdownCategoriaFiltroAberto(true)}
             autoComplete="off"
           />
+          {/* Dropdown para filtroCategoria */}
           {dropdownCategoriaFiltroAberto && (filtroCategoria.length === 0 || filtroCategoria.length > 1) && categoriasFiltradasDropdown.length > 0 && (
             <ul className="absolute left-0 right-0 border border-gray-300 rounded bg-white mt-1 max-h-40 overflow-y-auto z-20 shadow-lg">
               {categoriasFiltradasDropdown.map(categoria => (
@@ -343,9 +450,10 @@ export default function Reservas() {
           onChange={e => setFiltroStatus(e.target.value)}
         >
           <option value="">Todos os status</option>
-          <option value="Ativa">Ativa</option>
-          <option value="Efetivada">Efetivada</option>
-          <option value="Cancelada">Cancelada</option>
+          <option value="ativa">Ativa</option>
+          <option value="cancelada">Cancelada</option>
+          <option value="atendida">Efetivada</option>
+          <option value="expirada">Expirada</option>
         </select>
         <button
           className="ml-auto px-4 py-2 bg-blue-700 text-white rounded hover:bg-blue-800 font-semibold"
@@ -354,6 +462,7 @@ export default function Reservas() {
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full border border-gray-300 rounded">
+          {/* Table Head */}
           <thead className="bg-blue-100">
             <tr>
               <th className="px-4 py-2 text-left">Livro</th>
@@ -363,29 +472,60 @@ export default function Reservas() {
               <th className="px-4 py-2 text-left">Ações</th>
             </tr>
           </thead>
+          {/* Table Body */}
           <tbody>
             {filtrarReservas().map(r => (
-              <tr key={r.id} className="border-t border-gray-200 hover:bg-gray-50">
-                <td className="px-4 py-2">{r.livro.titulo} <span className="text-xs text-gray-500">({r.livro.autor})</span></td>
-                <td className="px-4 py-2">{r.usuario.nome} <span className="text-xs text-gray-500">({r.usuario.tipo})</span></td>
-                <td className="px-4 py-2">{r.dataReserva}</td>
+              <tr key={r.id_reserva} className="border-t border-gray-200 hover:bg-gray-50">
+                <td className="px-4 py-2">
+                  {r.livro
+                    ? (
+                        <>
+                          {r.livro.titulo}{" "}
+                          <span className="text-xs text-gray-500">
+                            {Array.isArray(r.livro.autores) && r.livro.autores.length > 0
+                              ? `(${r.livro.autores.map((a) => a.nome).join(", ")})`
+                              : ""}
+                          </span>
+                        </>
+                      )
+                    : <span className="text-gray-400 italic">Livro não disponível</span>
+                  }
+                </td>
+                <td className="px-4 py-2">{r.usuario.nome} <span className="text-xs text-gray-500">({r.usuario.role || "-"})</span></td>
+                <td className="px-4 py-2">{r.data_reserva}</td>
                 <td className="px-4 py-2">
                   <span className={
-                    r.status === "Ativa"
-                      ? "bg-yellow-200 text-yellow-800 px-2 py-1 rounded text-xs"
-                      : r.status === "Efetivada"
+                    r.status === "ativa"
                       ? "bg-green-200 text-green-800 px-2 py-1 rounded text-xs"
-                      : "bg-red-200 text-red-800 px-2 py-1 rounded text-xs"
+                      : r.status === "cancelada"
+                      ? "bg-red-200 text-red-800 px-2 py-1 rounded text-xs"
+                      : r.status === "atendida"
+                      ? "bg-yellow-200 text-yellow-800 px-2 py-1 rounded text-xs"
+                      : "bg-gray-200 text-gray-800 px-2 py-1 rounded text-xs"
                   }>
-                    {r.status}
+                    {statusReservaLabel(r.status)}
                   </span>
                 </td>
-                <td className="px-4 py-2 flex gap-2">
-                  {r.status === "Ativa" && (
-                    <button
-                      className="px-3 py-1 bg-red-700 text-white rounded hover:bg-red-800 text-xs"
-                      onClick={() => cancelarReserva(r.id)}
-                    >Cancelar</button>
+                <td className="px-4 py-2">
+                  {/* Permite cancelar se for funcionário OU se for reserva do próprio usuário autenticado */}
+                  {r.status === "ativa" && (
+                    <>
+                      {authUser?.role === "funcionario" ? (
+                        <button
+                          className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs"
+                          onClick={() => cancelarReserva(r.id_reserva)}
+                        >
+                          Cancelar
+                        </button>
+                      ) : authUser && r.usuario.id_usuario === authUser.user_id ? (
+                        <button
+                          className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs"
+                          onClick={() => cancelarReserva(r.id_reserva, true)}
+                        >
+                          Cancelar
+                        </button>
+                      ) : null}
+                    </>
                   )}
                 </td>
               </tr>
@@ -401,85 +541,84 @@ export default function Reservas() {
       {/* Modal Nova Reserva */}
       {modalNova && (
         <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-          <div className="bg-white rounded shadow-lg p-6 min-w-[320px] max-w-[90vw]">
-            <h2 className="text-xl font-bold mb-2">Nova Reserva</h2>
-            <form onSubmit={criarReserva} className="flex flex-col gap-4">
-              <label className="font-semibold text-gray-900">
-                Livro:
-                <div className="relative" ref={livroModalDropdownRef}>
-                  <input
-                    type="text"
-                    className="w-full p-2 border border-gray-400 rounded mt-1"
-                    placeholder="Digite o título do livro"
-                    value={buscaLivroModal}
-                    onChange={e => {
-                      setBuscaLivroModal(e.target.value);
-                      setIsDropdownLivroModalOpen(true);
-                    }}
-                    onFocus={() => setIsDropdownLivroModalOpen(true)}
-                    required
-                  />
-                  {isDropdownLivroModalOpen && buscaLivroModal.length > 1 && livrosFiltradosModal.length > 0 && (
-                    <ul className="border border-gray-300 rounded bg-white mt-1 max-h-32 overflow-y-auto z-10 absolute left-0 right-0">
-                      {livrosFiltradosModal.map(livro => (
-                        <li
-                          key={livro.id}
-                          className={`px-2 py-1 cursor-pointer hover:bg-yellow-100 ${livroId === String(livro.id) ? 'bg-yellow-200' : ''}`}
-                          onClick={() => {
-                            setLivroId(String(livro.id));
-                            setBuscaLivroModal(livro.titulo);
-                            setLivrosFiltradosModal([]);
-                            setIsDropdownLivroModalOpen(false);
-                          }}
-                        >
-                          {livro.titulo} <span className="text-xs text-gray-500">({livro.autor})</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </label>
-              <label className="font-semibold text-gray-900">
-                Usuário:
-                <div className="relative" ref={usuarioModalDropdownRef}>
-                  <input
-                    type="text"
-                    className="w-full p-2 border border-gray-400 rounded mt-1"
-                    placeholder="Digite o nome do usuário"
-                    value={buscaUsuarioModal}
-                    onChange={e => {
-                      setBuscaUsuarioModal(e.target.value);
-                      setUsuarioId("");
-                      setIsDropdownUsuarioModalOpen(true);
-                    }}
-                    onFocus={() => setIsDropdownUsuarioModalOpen(true)}
-                    required
-                  />
-                  {isDropdownUsuarioModalOpen && buscaUsuarioModal.length > 1 && usuariosFiltradosModal.length > 0 && (
-                    <ul className="border border-gray-300 rounded bg-white mt-1 max-h-32 overflow-y-auto z-10 absolute left-0 right-0">
-                      {usuariosFiltradosModal.map(usuario => (
-                        <li
-                          key={usuario.id}
-                          className={`px-2 py-1 cursor-pointer hover:bg-yellow-100 ${usuarioId === String(usuario.id) ? 'bg-yellow-200' : ''}`}
-                          onClick={() => {
-                            setUsuarioId(String(usuario.id));
-                            setBuscaUsuarioModal(usuario.nome);
-                            setUsuariosFiltradosModal([]);
-                            setIsDropdownUsuarioModalOpen(false);
-                          }}
-                        >
-                          {usuario.nome} <span className="text-xs text-gray-500">({usuario.tipo})</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </label>
-              <div className="flex gap-2 mt-2">
-                <button type="submit" className="bg-blue-700 text-white px-4 py-2 rounded hover:bg-blue-800 font-semibold">Confirmar</button>
-                <button type="button" onClick={() => { setModalNova(false); setMensagem(""); setLivroId(""); setUsuarioId(""); setBuscaLivroModal(""); setBuscaUsuarioModal(""); }} className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400 font-semibold">Cancelar</button>
+          <div className="bg-white rounded shadow-lg p-6 min-w-[350px] max-w-[90vw]">
+            <h2 className="text-xl font-bold mb-4">Nova Reserva</h2>
+            {mensagem && <div className={`mb-3 p-2 rounded ${mensagem.includes("sucesso") ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>{mensagem}</div>}
+            <form onSubmit={criarReserva}>
+              <div className="mb-4 relative" ref={livroModalDropdownRef}>
+                <label htmlFor="livroModal" className="block mb-1 font-semibold">Livro:</label>
+                <input
+                  type="text"
+                  id="livroModal"
+                  className="w-full p-2 border border-gray-400 rounded"
+                  placeholder="Buscar livro pelo título"
+                  value={buscaLivroModal}
+                  onChange={e => {
+                    setBuscaLivroModal(e.target.value);
+                    setLivroId(""); // Clear selection when typing
+                    setIsDropdownLivroModalOpen(true);
+                  }}
+                  onFocus={() => setIsDropdownLivroModalOpen(true)}
+                  autoComplete="off"
+                />
+                {isDropdownLivroModalOpen && buscaLivroModal.length > 1 && livrosFiltradosModal.length > 0 && (
+                  <ul className="border border-gray-300 rounded bg-white mt-1 max-h-32 overflow-y-auto z-20 absolute left-0 right-0">
+                    {livrosFiltradosModal.map(livro => (
+                      <li
+                        key={livro.id_livro}
+                        className={`px-2 py-1 cursor-pointer hover:bg-blue-100 ${livroId === String(livro.id_livro) ? 'bg-blue-200' : ''}`}
+                        onMouseDown={e => e.preventDefault()}
+                        onClick={() => {
+                          setLivroId(String(livro.id_livro));
+                          setBuscaLivroModal(livro.titulo);
+                          setIsDropdownLivroModalOpen(false);
+                        }}
+                      >
+                        {livro.titulo} <span className="text-xs text-gray-500">{Array.isArray(livro.autores) && livro.autores.length > 0 ? `(${livro.autores.map(a => a.nome).join(", ")})` : ""}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
-              {mensagem && <div className="text-green-700 font-semibold mt-2">{mensagem}</div>}
+              <div className="mb-4 relative" ref={usuarioModalDropdownRef}>
+                <label htmlFor="usuarioModal" className="block mb-1 font-semibold">Usuário:</label>
+                <input
+                  type="text"
+                  id="usuarioModal"
+                  className="w-full p-2 border border-gray-400 rounded"
+                  placeholder="Buscar usuário pelo nome"
+                  value={buscaUsuarioModal}
+                  onChange={e => {
+                    setBuscaUsuarioModal(e.target.value);
+                    setUsuarioId(""); // Clear selection
+                    setIsDropdownUsuarioModalOpen(true);
+                  }}
+                  onFocus={() => setIsDropdownUsuarioModalOpen(true)}
+                  autoComplete="off"
+                />
+                {isDropdownUsuarioModalOpen && buscaUsuarioModal.length > 1 && usuariosFiltradosModal.length > 0 && (
+                  <ul className="border border-gray-300 rounded bg-white mt-1 max-h-32 overflow-y-auto z-20 absolute left-0 right-0">
+                    {usuariosFiltradosModal.map(usuario => (
+                      <li
+                        key={usuario.id_usuario}
+                        className={`px-2 py-1 cursor-pointer hover:bg-blue-100 ${usuarioId === String(usuario.id_usuario) ? 'bg-blue-200' : ''}`}
+                        onMouseDown={e => e.preventDefault()}
+                        onClick={() => {
+                          setUsuarioId(String(usuario.id_usuario));
+                          setBuscaUsuarioModal(usuario.nome);
+                          setIsDropdownUsuarioModalOpen(false);
+                        }}
+                      >
+                        {usuario.nome} <span className="text-xs text-gray-500">({usuario.role})</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <div className="flex justify-end gap-3 mt-5">
+                <button type="button" onClick={() => { setModalNova(false); setMensagem(""); }} className="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 font-semibold">Cancelar</button>
+                <button type="submit" className="px-4 py-2 bg-blue-700 text-white rounded hover:bg-blue-800 font-semibold">Criar Reserva</button>
+              </div>
             </form>
           </div>
         </div>
@@ -487,3 +626,5 @@ export default function Reservas() {
     </div>
   );
 }
+
+export default withAuth(ReservasPage, ['funcionario', 'aluno']);
