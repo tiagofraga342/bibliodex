@@ -2,42 +2,71 @@ version: '3.8'
 
 services:
   db:
-    image: postgres:15-alpine # Sugestão: -alpine para uma imagem menor do Postgres
-    ports:
-      - "5433:5432" # Mapeia porta 5433 do host para 5432 do container
+    image: postgres:15-alpine # Using PostgreSQL 15
+    container_name: bibliodex_db
     environment:
-      POSTGRES_USER: bibliodex
-      POSTGRES_PASSWORD: bibliodex # Considere usar secrets ou .env file para produção
-      POSTGRES_DB: bibliodex_db
+      POSTGRES_USER: bibliodex_user # Define your desired user
+      POSTGRES_PASSWORD: bibliodex_password # Define your desired password
+      POSTGRES_DB: bibliodex_db # Define your desired database name
     volumes:
-      - db_data:/var/lib/postgresql/data # Volume nomeado para persistir dados do banco
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro # CORRIGIDO: Monta o init.sql DENTRO do diretório :ro (read-only)
+      - db_data:/var/lib/postgresql/data # Persist database data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql # Run init script on first start
+    ports:
+      - "5432:5432" # Expose PostgreSQL port to host (optional, for direct access)
+    networks:
+      - bibliodex-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bibliodex -d bibliodex_db"]
-      interval: 10s # Intervalo um pouco maior para dar tempo ao DB
+      test: ["CMD-SHELL", "pg_isready -U bibliodex_user -d bibliodex_db"]
+      interval: 10s
       timeout: 5s
       retries: 5
-    restart: unless-stopped # Adicionado para reiniciar o DB a menos que parado manualmente
+      start_period: 10s
+    restart: unless-stopped
 
-  api:
+  backend:
     build:
-      context: ./backend # Especifica o diretório do Dockerfile
-      dockerfile: Dockerfile # Especifica o nome do Dockerfile (opcional se for 'Dockerfile')
+      context: ./backend # Path to your backend Dockerfile
+      dockerfile: Dockerfile
+    container_name: bibliodex_backend
+    environment:
+      # Ensure this matches the credentials and db name in the 'db' service
+      DATABASE_URL: "postgresql://bibliodex_user:bibliodex_password@db:5432/bibliodex_db"
+      SECRET_KEY: "your_super_secret_and_long_jwt_key_here_12345" # CHANGE THIS IN PRODUCTION
+      ALLOWED_ORIGINS: "http://localhost:3001,http://127.0.0.1:3001" # Adjust for your frontend dev/prod URLs
+      # PYTHONUNBUFFERED: 1 # Often useful for seeing logs immediately
     ports:
-      - "8000:8000"
+      - "8000:8000" # Expose backend API port
+    networks:
+      - bibliodex-network
     depends_on:
       db:
-        condition: service_healthy # Garante que o DB esteja saudável antes da API iniciar
+        condition: service_healthy # Wait for db to be healthy
+    restart: unless-stopped
+    # No SQLite volume needed anymore
+
+  frontend:
+    build:
+      context: ./frontend # Path to your frontend Dockerfile
+      dockerfile: Dockerfile
+    container_name: bibliodex_frontend
+    ports:
+      - "3001:3000" # Expose frontend port (using 3001 on host to avoid conflict if local dev runs on 3000)
+    networks:
+      - bibliodex-network
     environment:
-      # CORRIGIDO: Usando 'postgresql' como esquema para SQLAlchemy
-      DATABASE_URL: postgresql://bibliodex:bibliodex@db:5432/bibliodex_db
-      # PYTHONUNBUFFERED: 1 # Garante que os logs do Python apareçam imediatamente (útil para debug)
-    volumes:
-      # Para desenvolvimento: monta o código local no container para live reload.
-      # Para produção: remova este volume para usar o código copiado na imagem Docker.
-      - ./backend:/code
-      # - ./scripts:/scripts # Descomente se você tiver um diretório de scripts para montar
-    restart: unless-stopped # Adicionado para reiniciar a API a menos que parada manualmente
+      # NEXT_PUBLIC_API_BASE_URL is already set in the frontend Dockerfile to http://backend:8000
+      # NODE_ENV: development # Or 'production' depending on the build stage in Dockerfile
+      # If your frontend Dockerfile builds for production, NODE_ENV=production is usually set there.
+      # If you want to override for local docker-compose development:
+      NODE_ENV: development
+    depends_on:
+      - backend # Wait for backend to start
+    restart: unless-stopped
 
 volumes:
-  db_data: # Define o volume nomeado para persistência dos dados do banco
+  db_data: # Named volume for PostgreSQL data persistence
+  # backend_data: # Remove if it was for SQLite and no longer needed
+
+networks:
+  bibliodex-network:
+    driver: bridge

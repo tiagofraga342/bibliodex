@@ -1,32 +1,91 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List
+from sqlalchemy.orm import Session
 from app.database import get_db
 import app.crud as crud
+import app.schemas as schemas
+import app.models as models
+from app.routers.auth import get_current_active_funcionario, get_current_active_usuario_cliente # Adicionado get_current_active_usuario_cliente
+import logging # Import logging
+
 
 router = APIRouter()
+logger = logging.getLogger(__name__) # Logger para este módulo
 
-@router.get("/", response_model=List[dict])
-def listar_usuarios(db = Depends(get_db)):
-    try:
-        usuarios = crud.get_usuarios(db)
-        return [dict(u) for u in usuarios]
-    except Exception as e:
-        print(f"Erro ao listar usuários: {e}")
-        raise HTTPException(500, "Erro interno ao buscar usuários")
+@router.get("/", response_model=List[schemas.UsuarioRead])
+def listar_usuarios(
+    db: Session = Depends(get_db), 
+    current_funcionario: models.Funcionario = Depends(get_current_active_funcionario),
+    skip: int = 0, # Adicionado skip
+    limit: int = 100, # Adicionado limit
+    nome_like: str = Query(None, description="Busca por nome (autocomplete)"),
+    sort_by: str = "nome",
+    sort_dir: str = "asc"
+):
+    logger.info(f"Funcionário '{current_funcionario.matricula_funcional}' listando usuários com skip={skip}, limit={limit}")
+    usuarios = crud.get_usuarios(
+        db,
+        skip=skip,
+        limit=limit,
+        nome_like=nome_like,
+        sort_by=sort_by,
+        sort_dir=sort_dir
+    )
+    logger.debug(f"Encontrados {len(usuarios)} usuários.")
+    return usuarios
 
-@router.get("/{usuario_id}", response_model=dict)
-def obter_usuario(usuario_id: int, db = Depends(get_db)):
+@router.get("/me", response_model=schemas.UsuarioRead) # Endpoint para o usuário obter seus próprios dados
+async def read_users_me(current_user: models.Usuario = Depends(get_current_active_usuario_cliente)):
+    logger.info(f"Usuário '{current_user.matricula}' acessando seus próprios dados (/me).")
+    return current_user
+
+@router.get("/{usuario_id}", response_model=schemas.UsuarioRead)
+def obter_usuario(
+    usuario_id: int, 
+    db: Session = Depends(get_db), 
+    current_funcionario: models.Funcionario = Depends(get_current_active_funcionario)
+):
+    logger.info(f"Funcionário '{current_funcionario.matricula_funcional}' buscando usuário ID: {usuario_id}")
     usuario = crud.get_usuario(db, usuario_id)
     if not usuario:
-        raise HTTPException(404, "Usuário não encontrado")
+        logger.warning(f"Usuário com ID {usuario_id} não encontrado.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
+    logger.debug(f"Usuário ID {usuario_id} encontrado: {usuario.matricula}")
     return usuario
 
-@router.post("/", response_model=dict, status_code=201)
-def criar_usuario(usuario: dict, db = Depends(get_db)):
-    return crud.create_usuario(db, usuario)
+@router.post("/", response_model=schemas.UsuarioRead, status_code=status.HTTP_201_CREATED)
+def criar_usuario(
+    usuario: schemas.UsuarioCreate, 
+    db: Session = Depends(get_db),
+    current_funcionario: models.Funcionario = Depends(get_current_active_funcionario)
+):
+    logger.info(f"Funcionário '{current_funcionario.matricula_funcional}' tentando criar usuário: {usuario.matricula}")
+    try:
+        # A verificação de matrícula duplicada e de curso_id é feita no crud.create_usuario
+        novo_usuario = crud.create_usuario(db=db, usuario=usuario)
+        logger.info(f"Usuário '{novo_usuario.matricula}' (ID: {novo_usuario.id_usuario}) criado com sucesso por '{current_funcionario.matricula_funcional}'.")
+        return novo_usuario
+    except HTTPException as e:
+        logger.error(f"Erro ao criar usuário '{usuario.matricula}' por '{current_funcionario.matricula_funcional}': {e.detail}")
+        raise e
+    except Exception as e:
+        logger.exception(f"Erro inesperado ao criar usuário '{usuario.matricula}' por '{current_funcionario.matricula_funcional}': {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Erro interno ao criar usuário.")
 
-@router.delete("/{usuario_id}", status_code=204)
-def excluir_usuario(usuario_id: int, db = Depends(get_db)):
-    if not crud.get_usuario(db, usuario_id):
-        raise HTTPException(404, "Usuário não encontrado")
-    crud.delete_usuario(db, usuario_id)
+
+@router.delete("/{usuario_id}", status_code=status.HTTP_204_NO_CONTENT)
+def excluir_usuario(
+    usuario_id: int, 
+    db: Session = Depends(get_db), 
+    current_funcionario: models.Funcionario = Depends(get_current_active_funcionario)
+):
+    logger.info(f"Funcionário '{current_funcionario.matricula_funcional}' tentando excluir usuário ID: {usuario_id}")
+    # crud.delete_usuario agora lida com as verificações e levanta HTTPExceptions
+    deleted_usuario = crud.delete_usuario(db, usuario_id)
+    
+    if deleted_usuario is None and not crud.get_usuario(db, usuario_id): # Checa se realmente não existe mais
+         logger.warning(f"Usuário ID {usuario_id} não encontrado para exclusão por '{current_funcionario.matricula_funcional}'.")
+         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
+
+    logger.info(f"Usuário ID {usuario_id} excluído (ou tentativa de exclusão processada) por '{current_funcionario.matricula_funcional}'.")
+    return None

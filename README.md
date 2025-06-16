@@ -9,8 +9,10 @@
 - 🔍 Consulta de livros por título, autor ou categoria
 - 📦 Controle de empréstimos e devoluções
 - ⏳ Reservas com verificação de disponibilidade
-- 👥 Cadastro e gerenciamento de usuários (alunos, funcionários)
+- 👥 Cadastro e gerenciamento de usuários (alunos, funcionários) com autenticação e autorização baseadas em JWT
 - 📑 Relatórios sobre uso da biblioteca, livros mais emprestados, penalidades
+- 🛡️ API robusta com logging detalhado e tratamento de erros centralizado
+- 🐳 Backend containerizado com Docker para fácil implantação e escalabilidade
 - 🧠 Otimizações aplicadas: índices compostos, views materializadas, particionamento
 - 🤖 Uso de IA Generativa (ChatGPT, Copilot) para geração de scripts, testes e tuning
 
@@ -18,11 +20,12 @@
 
 ## 🧱 Arquitetura do Sistema
 
-- **Frontend**: React.js com Axios para consumo de APIs
-- **Backend**: FastAPI (Python) com validações Pydantic
-- **Banco de Dados**: PostgreSQL com tuning de desempenho
-- **Relatórios**: Metabase integrado ao banco para visualização de dados críticos
-- **Ferramentas de IA**: ChatGPT para sugestões de modelagem e código
+- **Frontend**: React.js (Next.js) para uma interface de usuário moderna e responsiva.
+- **Backend**: FastAPI (Python) utilizando SQLAlchemy para ORM, Pydantic para validação de dados, e JWT para autenticação segura.
+- **Banco de Dados**: PostgreSQL, otimizado para desempenho e consultas complexas.
+- **Containerização**: Docker para empacotar e executar o ambiente backend de forma consistente.
+- **Relatórios**: Metabase integrado ao banco para visualização de dados críticos.
+- **Ferramentas de IA**: ChatGPT para sugestões de modelagem e código, GitHub Copilot para assistência no desenvolvimento.
 
 ---
 

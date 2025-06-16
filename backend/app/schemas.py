@@ -1,10 +1,26 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, EmailStr
 from typing import Optional, List
-from datetime import date # Import date
+from datetime import date
 
-# --- Forward References Helper ---
-# For models that refer to each other, Pydantic needs a little help initially.
-# We'll define basic "Read" schemas first, then more complete ones.
+# --- Schemas de Autenticação (Passo 3.3) ---
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    sub: str # 'subject', normalmente o username (matrícula ou matrícula_funcional)
+    user_id: Optional[int] = None
+    role: Optional[str] = None # 'usuario_cliente' ou 'funcionario'
+
+class UserLogin(BaseModel): # Para login de Usuário (cliente)
+    matricula: str
+    password: str
+
+class FuncionarioLogin(BaseModel): # Para login de Funcionário
+    matricula_funcional: str
+    password: str
+
+# --- Schemas Existentes Atualizados ---
 
 # --- Autor Schemas ---
 class AutorBase(BaseModel):
@@ -14,7 +30,7 @@ class AutorBase(BaseModel):
 class AutorCreate(AutorBase):
     pass
 
-class AutorReadBasic(AutorBase): # Basic version for nesting
+class AutorReadBasic(AutorBase):
     id_autor: int
     model_config = ConfigDict(from_attributes=True)
 
@@ -25,7 +41,7 @@ class CategoriaBase(BaseModel):
 class CategoriaCreate(CategoriaBase):
     pass
 
-class CategoriaReadBasic(CategoriaBase): # Basic version for nesting
+class CategoriaReadBasic(CategoriaBase):
     id_categoria: int
     model_config = ConfigDict(from_attributes=True)
 
@@ -37,26 +53,23 @@ class LivroBase(BaseModel):
     id_categoria: int
 
 class LivroCreate(LivroBase):
-    ids_autores: Optional[List[int]] = Field(None, description="List of Author IDs to associate with this book")
+    ids_autores: Optional[List[int]] = Field(None, description="Lista de IDs de Autores para associar a este livro")
 
-class LivroReadBasic(LivroBase): # Basic version for nesting, e.g., in CategoriaRead
+class LivroReadBasic(LivroBase):
     id_livro: int
     model_config = ConfigDict(from_attributes=True)
 
-class LivroRead(LivroBase): # Full version
+class LivroRead(LivroBase):
     id_livro: int
     categoria: CategoriaReadBasic
     autores: List[AutorReadBasic] = []
-    # exemplares: List['ExemplarReadBasic'] = [] # Add if needed, define ExemplarReadBasic
     model_config = ConfigDict(from_attributes=True)
 
-# --- Update CategoriaRead to include a list of basic Livro info ---
 class CategoriaRead(CategoriaBase):
     id_categoria: int
     livros: List[LivroReadBasic] = []
     model_config = ConfigDict(from_attributes=True)
 
-# --- Update AutorRead to include a list of basic Livro info ---
 class AutorRead(AutorBase):
     id_autor: int
     livros: List[LivroReadBasic] = []
@@ -70,38 +83,37 @@ class CursoBase(BaseModel):
 class CursoCreate(CursoBase):
     pass
 
-class CursoReadBasic(CursoBase): # Basic for nesting
+class CursoReadBasic(CursoBase):
     id_curso: int
     model_config = ConfigDict(from_attributes=True)
 
-class CursoRead(CursoBase): # Full version
+class CursoRead(CursoBase):
     id_curso: int
-    # usuarios: List['UsuarioReadBasic'] = [] # Add if needed, define UsuarioReadBasic
     model_config = ConfigDict(from_attributes=True)
-
 
 # --- Usuario Schemas ---
 class UsuarioBase(BaseModel):
     nome: str
     telefone: Optional[str] = None
     matricula: str
-    email: Optional[str] = None
+    email: Optional[EmailStr] = None # Usando EmailStr para validação de e-mail
     id_curso: Optional[int] = None
 
-class UsuarioCreate(UsuarioBase):
-    pass
+class UsuarioCreate(UsuarioBase): # Passo 3.1
+    password: str # Campo para receber a senha em texto plano no cadastro
 
-class UsuarioReadBasic(UsuarioBase): # Basic for nesting
+class UsuarioRead(UsuarioBase): # Passo 3.2
     id_usuario: int
-    model_config = ConfigDict(from_attributes=True)
-
-class UsuarioRead(UsuarioBase): # Full version
-    id_usuario: int
+    is_active: bool # Decidido incluir is_active na resposta
     curso: Optional[CursoReadBasic] = None
-    # emprestimos: List['EmprestimoReadBasic'] = []
-    # reservas: List['ReservaReadBasic'] = []
-    # penalidades: List['PenalidadeReadBasic'] = []
+    # hashed_password NÃO é incluído aqui por segurança
     model_config = ConfigDict(from_attributes=True)
+
+class UsuarioReadBasic(UsuarioBase):
+    id_usuario: int
+    is_active: bool
+    model_config = ConfigDict(from_attributes=True)
+
 
 # --- Funcionario Schemas ---
 class FuncionarioBase(BaseModel):
@@ -109,19 +121,28 @@ class FuncionarioBase(BaseModel):
     cargo: str
     matricula_funcional: str
 
-class FuncionarioCreate(FuncionarioBase):
-    pass
+class FuncionarioCreate(FuncionarioBase): # Passo 3.1
+    password: str # Campo para receber a senha em texto plano no cadastro
 
-class FuncionarioReadBasic(FuncionarioBase): # Basic for nesting
+class FuncionarioRead(FuncionarioBase): # Passo 3.2
     id_funcionario: int
+    is_active: bool # Decidido incluir is_active na resposta
+    # hashed_password NÃO é incluído aqui por segurança
     model_config = ConfigDict(from_attributes=True)
 
-class FuncionarioRead(FuncionarioBase): # Full version
+class FuncionarioReadBasic(FuncionarioBase):
     id_funcionario: int
-    # emprestimos_registrados: List['EmprestimoReadBasic'] = []
-    # reservas_registradas: List['ReservaReadBasic'] = []
-    # devolucoes_registradas: List['DevolucaoReadBasic'] = []
+    is_active: bool
     model_config = ConfigDict(from_attributes=True)
+
+class FuncionarioUpdate(BaseModel): # Novo schema para atualização
+    nome: Optional[str] = None
+    cargo: Optional[str] = None
+    # matricula_funcional: Optional[str] = None # Geralmente não se permite alterar matrícula
+    password: Optional[str] = None # Para permitir atualização de senha
+    is_active: Optional[bool] = None
+    model_config = ConfigDict(from_attributes=True)
+
 
 # --- Exemplar Schemas ---
 class ExemplarBase(BaseModel):
@@ -134,15 +155,20 @@ class ExemplarBase(BaseModel):
 class ExemplarCreate(ExemplarBase):
     pass
 
-class ExemplarReadBasic(ExemplarBase): # Basic for nesting
+class ExemplarUpdate(BaseModel):
+    codigo_identificacao: Optional[str] = None
+    status: Optional[str] = None
+    data_aquisicao: Optional[date] = None
+    observacoes: Optional[str] = None
+    id_livro: Optional[int] = None
+
+class ExemplarReadBasic(ExemplarBase):
     id_exemplar: int
     model_config = ConfigDict(from_attributes=True)
 
-class ExemplarRead(ExemplarBase): # Full version
+class ExemplarRead(ExemplarBase):
     id_exemplar: int
-    livro: LivroReadBasic # Show basic info of the book it belongs to
-    # emprestimos: List['EmprestimoReadBasic'] = []
-    # reservas: List['ReservaReadBasic'] = []
+    livro: LivroReadBasic
     model_config = ConfigDict(from_attributes=True)
 
 # --- Emprestimo Schemas ---
@@ -158,41 +184,39 @@ class EmprestimoBase(BaseModel):
 class EmprestimoCreate(EmprestimoBase):
     pass
 
-class EmprestimoReadBasic(EmprestimoBase): # Basic for nesting
+class EmprestimoReadBasic(EmprestimoBase):
     id_emprestimo: int
     model_config = ConfigDict(from_attributes=True)
 
-class EmprestimoRead(EmprestimoBase): # Full version
+class EmprestimoRead(EmprestimoBase):
     id_emprestimo: int
-    usuario: UsuarioReadBasic
+    usuario: UsuarioReadBasic # Usando a versão básica para evitar muita informação aninhada
     exemplar: ExemplarReadBasic
     funcionario_registro_emprestimo: FuncionarioReadBasic
-    # devolucao: Optional['DevolucaoReadBasic'] = None
     model_config = ConfigDict(from_attributes=True)
-
 
 # --- Reserva Schemas ---
 class ReservaBase(BaseModel):
     data_reserva: date
     data_validade_reserva: date
     status: str = Field(default="ativa", comment="Status: ativa, cancelada, expirada, atendida")
-    id_exemplar: Optional[int] = None # Can reserve a specific copy
-    id_livro_solicitado: Optional[int] = None # Or reserve a title in general
+    id_exemplar: Optional[int] = None
+    id_livro_solicitado: Optional[int] = None
     id_usuario: int
-    id_funcionario_registro: Optional[int] = None # Can be self-service
+    id_funcionario_registro: Optional[int] = None
 
 class ReservaCreate(ReservaBase):
     pass
 
-class ReservaReadBasic(ReservaBase): # Basic for nesting
+class ReservaReadBasic(ReservaBase):
     id_reserva: int
     model_config = ConfigDict(from_attributes=True)
 
-class ReservaRead(ReservaBase): # Full version
+class ReservaRead(ReservaBase):
     id_reserva: int
     usuario: UsuarioReadBasic
     exemplar: Optional[ExemplarReadBasic] = None
-    livro: Optional[LivroReadBasic] = None # Corresponds to id_livro_solicitado
+    livro: Optional[LivroReadBasic] = None # Corresponde a id_livro_solicitado
     funcionario_registro_reserva: Optional[FuncionarioReadBasic] = None
     model_config = ConfigDict(from_attributes=True)
 
@@ -201,19 +225,19 @@ class DevolucaoBase(BaseModel):
     data_devolucao: date
     observacoes: Optional[str] = None
     id_funcionario_registro: int
-    id_emprestimo: int # Should be unique
+    id_emprestimo: int
 
 class DevolucaoCreate(DevolucaoBase):
     pass
 
-class DevolucaoReadBasic(DevolucaoBase): # Basic for nesting
+class DevolucaoReadBasic(DevolucaoBase):
     id_devolucao: int
     model_config = ConfigDict(from_attributes=True)
 
-class DevolucaoRead(DevolucaoBase): # Full version
+class DevolucaoRead(DevolucaoBase):
     id_devolucao: int
     funcionario_registro_devolucao: FuncionarioReadBasic
-    emprestimo: EmprestimoReadBasic # Show info about the loan being returned
+    emprestimo: EmprestimoReadBasic
     model_config = ConfigDict(from_attributes=True)
 
 # --- Penalidade Schemas ---
@@ -221,7 +245,7 @@ class PenalidadeBase(BaseModel):
     tipo_penalidade: str = Field(comment="Ex: multa, suspensao")
     data_inicio: date
     data_fim: Optional[date] = None
-    valor_multa: Optional[float] = None # Corrected to float
+    valor_multa: Optional[float] = None
     status: str = Field(default="ativa", comment="Status: ativa, paga, cumprida, cancelada")
     observacoes: Optional[str] = None
     id_usuario: int
@@ -230,22 +254,13 @@ class PenalidadeBase(BaseModel):
 class PenalidadeCreate(PenalidadeBase):
     pass
 
-class PenalidadeReadBasic(PenalidadeBase): # Basic for nesting
+class PenalidadeReadBasic(PenalidadeBase):
     id_penalidade: int
     model_config = ConfigDict(from_attributes=True)
 
-class PenalidadeRead(PenalidadeBase): # Full version
+class PenalidadeRead(PenalidadeBase):
     id_penalidade: int
     usuario: UsuarioReadBasic
     emprestimo_relacionado: Optional[EmprestimoReadBasic] = None
     model_config = ConfigDict(from_attributes=True)
 
-# Update forward references if Pydantic V1 style was needed for complex cases
-# Pydantic V2 generally handles this better with string annotations.
-# If you encounter issues, you might need to explicitly update_forward_refs()
-# Example:
-# LivroRead.model_rebuild()
-# CategoriaRead.model_rebuild()
-# AutorRead.model_rebuild()
-# ... and so on for all models with forward references or complex nesting.
-# For Pydantic V2, this is often not necessary if types are hinted correctly.

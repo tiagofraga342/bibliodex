@@ -4,17 +4,16 @@ from app.models import Base # Import Base from your models.py
 import os
 
 SQLALCHEMY_DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://bibliodex:bibliodex@localhost:5432/bibliodex_db"
+    "DATABASE_URL", # Prioritizes the environment variable
+    "postgresql://bibliodex:bibliodex@localhost:5432/bibliodex_db" # Default if not set
 )
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 
-# If you are using Alembic for migrations, Base.metadata.create_all(bind=engine)
-# should not be called here directly in production.
-# For development, you might call it to create tables if they don't exist.
-# Consider where to best place this:
-# Base.metadata.create_all(bind=engine) # Creates tables if they don't exist
+# ATENÇÃO:
+# Em produção, recomenda-se usar Alembic para migrações de banco de dados.
+# Para desenvolvimento rápido/local, você pode descomentar a linha abaixo para criar as tabelas automaticamente.
+# Base.metadata.create_all(bind=engine) # Descomente para criar tabelas automaticamente em dev
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

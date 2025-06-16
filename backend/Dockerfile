@@ -19,7 +19,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Comando para executar a aplicação
-# Para desenvolvimento: --reload permite que o servidor reinicie com alterações no código
-# Para produção: remova --reload e considere mais workers se necessário com gunicorn, por exemplo.
-# Ex: CMD ["gunicorn", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "app.main:app", "--bind", "0.0.0.0:8000"]
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Para produção, usando gunicorn com UvicornWorker
+CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "app.main:app"]
