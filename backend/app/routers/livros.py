@@ -11,7 +11,7 @@ import logging # Import logging
 router = APIRouter()
 logger = logging.getLogger(__name__) # Logger para este módulo
 
-@router.get("/", response_model=List[schemas.LivroRead])
+@router.get("", response_model=List[schemas.LivroRead]) # Aceita somente requisições sem / no final
 def listar_livros(
     db: Session = Depends(get_db),
     skip: int = 0,

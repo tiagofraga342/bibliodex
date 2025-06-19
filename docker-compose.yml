@@ -42,15 +42,22 @@ services:
       db:
         condition: service_healthy # Wait for db to be healthy
     restart: unless-stopped
-    # No SQLite volume needed anymore
+    volumes:
+      - ./backend:/code # Permite hot reload do código Python
+      - ./scripts:/code/scripts
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   frontend:
     build:
       context: ./frontend # Path to your frontend Dockerfile
       dockerfile: Dockerfile
     container_name: bibliodex_frontend
+    command: npm run dev
+    volumes:
+      - ./frontend:/app # Mount local frontend code for live reloading
+      - /app/node_modules # Prevent host node_modules from interfering
     ports:
-      - "3001:3000" # Expose frontend port (using 3001 on host to avoid conflict if local dev runs on 3000)
+      - "3000:3000" # Expose frontend port (use 3000 on host for consistency)
     networks:
       - bibliodex-network
     environment:
@@ -58,7 +65,8 @@ services:
       # NODE_ENV: development # Or 'production' depending on the build stage in Dockerfile
       # If your frontend Dockerfile builds for production, NODE_ENV=production is usually set there.
       # If you want to override for local docker-compose development:
-      NODE_ENV: development
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_BASE_URL=http://backend:8000 # Ensure this points to the backend service
     depends_on:
       - backend # Wait for backend to start
     restart: unless-stopped

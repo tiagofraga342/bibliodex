@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import api, { setTokens, clearTokens, TOKEN_KEY, REFRESH_TOKEN_KEY, getAuthToken, getRefreshToken } from '../api';
-import jwt_decode from 'jwt-decode';
+import { jwtDecode } from 'jwt-decode';
 
 // Fix for "This expression is not callable" error with jwt-decode:
 // jwt_decode may be imported as a module object instead of a function depending on build config.
@@ -40,7 +40,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (storedToken) {
       setToken(storedToken);
       try {
-        const decodedUser = (jwt_decode as any)(storedToken) as User;
+        const decodedUser = (jwtDecode as any)(storedToken) as User;
         setUser(decodedUser);
       } catch (error) {
         console.error("Falha ao decodificar token JWT:", error);
@@ -65,7 +65,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setTokens(newAccessToken, newRefreshToken);
       setToken(newAccessToken);
       try {
-        const decodedUser = (jwt_decode as any)(newAccessToken) as User;
+        const decodedUser = (jwtDecode as any)(newAccessToken) as User;
         setUser(decodedUser);
       } catch (error) {
         console.error("Falha ao decodificar token JWT:", error);
@@ -100,7 +100,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     function scheduleRefresh(token: string) {
       try {
-        const decoded: any = (jwt_decode as any)(token);
+        const decoded: any = (jwtDecode as any)(token);
         if (decoded.exp) {
           const expiresAt = decoded.exp * 1000;
           const now = Date.now();
@@ -125,7 +125,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setTokens(res.data.access_token, res.data.refresh_token);
         setToken(res.data.access_token);
         try {
-          const decodedUser = (jwt_decode as any)(res.data.access_token) as User;
+          const decodedUser = (jwtDecode as any)(res.data.access_token) as User;
           setUser(decodedUser);
         } catch {
           setUser(null);

@@ -31,7 +31,7 @@ def main():
             categorias.append(cur.fetchone()[0])
         conn.commit()
 
-    statuses = ["disponível", "emprestado", "reservado"]
+    status_geral_options = ["ativo", "descatalogado"]
 
     for offset in range(0, BOOK_COUNT, BATCH_SIZE):
         batch = []
@@ -39,14 +39,14 @@ def main():
         for i in range(offset, upper):
             title = f"Livro Teste {i+1}"
             year = random.randint(1900, 2025)
-            status = random.choice(statuses)
+            status_geral = random.choice(status_geral_options)
             cat = random.choice(categorias)
-            batch.append((title, year, status, cat))
+            batch.append((title, year, status_geral, cat))
 
         execute_values(
             cur,
             """
-            INSERT INTO livro (titulo, ano_publicacao, status, id_categoria)
+            INSERT INTO livro (titulo, ano_publicacao, status_geral, id_categoria)
             VALUES %s
             """,
             batch

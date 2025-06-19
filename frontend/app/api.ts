@@ -117,7 +117,11 @@ export interface TokenResponse {
 }
 
 // --- Constantes e helpers ---
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+// Detecta ambiente: se rodando no browser, usa proxy '/api', senão usa variável de ambiente
+const API_BASE_URL =
+  typeof window !== "undefined"
+    ? "/api"
+    : (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000").replace(/^"|"$/g, "");
 const TOKEN_KEY = "bibliodex_access_token";
 const REFRESH_TOKEN_KEY = "bibliodex_refresh_token";
 
@@ -319,7 +323,11 @@ export async function fetchLivros(params: {
   sort_by?: string;
   sort_dir?: string;
 }) {
-  return api.get<LivroRead[]>("/livros", params);
+  // Remove parâmetros undefined antes de enviar
+  const cleanParams = Object.fromEntries(
+    Object.entries(params).filter(([_, v]) => v !== undefined && v !== null)
+  );
+  return api.get<LivroRead[]>("/livros", cleanParams);
 }
 
 // Exemplo de função para buscar usuários por nome (autocomplete)

@@ -37,12 +37,13 @@ def main():
             telefone   = f"{random.randint(1100000000, 1199999999)}"
             matricula  = 10000000 + i
             curso_id   = random.choice(cursos)
-            batch.append((nome, telefone, matricula, curso_id))
+            hashed_password = "$2b$12$abcdefghijklmnopqrstuv"  # hash fake para dev
+            batch.append((nome, telefone, matricula, curso_id, hashed_password))
 
         execute_values(
             cur,
             """
-            INSERT INTO usuario (nome, telefone, matricula, id_curso)
+            INSERT INTO usuario (nome, telefone, matricula, id_curso, hashed_password)
             VALUES %s
             """,
             batch

@@ -99,10 +99,10 @@ async def log_requests(request: Request, call_next):
 
 # Adicionando CORS para permitir requisições do frontend
 # Carregar origens permitidas a partir de uma variável de ambiente
-# Ajuste o fallback para incluir http://localhost:3001 e http://127.0.0.1:3001
+# Ajuste o fallback para incluir http://localhost:3000 e http://127.0.0.1:3000
 allowed_origins_str = os.getenv(
     "ALLOWED_ORIGINS",
-    "http://localhost:3001,http://127.0.0.1:3001"
+    "http://localhost:3000,http://127.0.0.1:3000"
 )
 allowed_origins_list = [origin.strip() for origin in allowed_origins_str.split(',') if origin.strip()]
 

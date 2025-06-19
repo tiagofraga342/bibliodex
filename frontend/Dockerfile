@@ -43,9 +43,18 @@ COPY --from=builder --chown=node:node /app/public ./public
 
 # Set the correct user for running the application.
 USER node
-
 EXPOSE 3000
-
-# CMD ["node", "server.js"]
-# Adiciona um echo antes de iniciar o servidor Node.js
 CMD ["sh", "-c", "echo 'INFO: Frontend acessível externamente em http://localhost:3001' && node server.js"]
+
+# Development image (for hot reload)
+FROM base AS dev
+WORKDIR /app
+COPY package.json yarn.lock* package-lock.json* ./
+RUN \
+  if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
+  elif [ -f package-lock.json ]; then npm ci; \
+  else echo 'Lockfile not found.' && exit 1; \
+  fi
+COPY . .
+EXPOSE 3000
+CMD ["npm", "run", "dev"]

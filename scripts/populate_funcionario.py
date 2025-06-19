@@ -32,12 +32,14 @@ def main():
         for i in range(offset, upper):
             nome = f"Funcionario Teste {i+1}"
             cargo = random.choice(CARGOS)
-            batch.append((nome, cargo))
+            matricula_funcional = f"FUNC{i+1:06d}"
+            hashed_password = "$2b$12$abcdefghijklmnopqrstuv"  # hash fake para dev
+            batch.append((nome, cargo, matricula_funcional, hashed_password))
 
         execute_values(
             cur,
             """
-            INSERT INTO funcionario (nome, cargo)
+            INSERT INTO funcionario (nome, cargo, matricula_funcional, hashed_password)
             VALUES %s
             """,
             batch
