@@ -11,7 +11,7 @@ import logging # Import logging
 router = APIRouter()
 logger = logging.getLogger(__name__) # Logger para este módulo
 
-@router.get("", response_model=List[schemas.LivroRead]) # Aceita somente requisições sem / no final
+@router.get("", response_model=schemas.PaginatedLivros)
 def listar_livros(
     db: Session = Depends(get_db),
     skip: int = 0,
@@ -23,10 +23,10 @@ def listar_livros(
     sort_dir: str = "asc"
 ):
     """
-    Listar livros com paginação, filtro e ordenação.
+    Listar livros com paginação, filtro e ordenação, retornando total e items.
     """
     logger.info(f"Listando livros com skip={skip}, limit={limit}, titulo={titulo}, autor={autor}, categoria_id={categoria_id}, sort_by={sort_by}, sort_dir={sort_dir}")
-    livros = crud.get_livros(
+    result = crud.get_livros_paginados(
         db,
         skip=skip,
         limit=limit,
@@ -36,8 +36,8 @@ def listar_livros(
         sort_by=sort_by,
         sort_dir=sort_dir
     )
-    logger.debug(f"Encontrados {len(livros)} livros.")
-    return livros
+    logger.debug(f"Encontrados {result['total']} livros (página atual: {len(result['items'])}).")
+    return result
 
 @router.get("/{livro_id}", response_model=schemas.LivroRead)
 def obter_livro(livro_id: int, db: Session = Depends(get_db)):
@@ -49,7 +49,7 @@ def obter_livro(livro_id: int, db: Session = Depends(get_db)):
     logger.debug(f"Livro ID {livro_id} encontrado: {livro.titulo}")
     return livro
 
-@router.post("/", response_model=schemas.LivroRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=schemas.LivroRead, status_code=status.HTTP_201_CREATED)
 def criar_livro(
     livro: schemas.LivroCreate, 
     db: Session = Depends(get_db),

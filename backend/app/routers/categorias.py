@@ -7,10 +7,10 @@ from app.database import get_db
 from app import crud, schemas, models # Import models
 from app.routers.auth import get_current_active_funcionario # Import auth dependency
 
-router = APIRouter(prefix="/categorias", tags=["Categorias"])
+router = APIRouter()
 logger = logging.getLogger(__name__) # Logger para este módulo
 
-@router.get("/", response_model=List[schemas.CategoriaRead])
+@router.get("", response_model=List[schemas.CategoriaReadBasic])
 def listar_categorias(db: Session = Depends(get_db), skip: int = 0, limit: int = 100): # Added skip and limit, typed db
     logger.info(f"Listando categorias com skip={skip}, limit={limit}")
     categorias = crud.get_categorias(db, skip=skip, limit=limit)
@@ -27,7 +27,7 @@ def obter_categoria(categoria_id: int, db: Session = Depends(get_db)): # Typed d
     logger.debug(f"Categoria ID {categoria_id} encontrada: {cat.nome}")
     return cat
 
-@router.post("/", response_model=schemas.CategoriaRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=schemas.CategoriaRead, status_code=status.HTTP_201_CREATED)
 def criar_categoria(
     cat: schemas.CategoriaCreate, 
     db: Session = Depends(get_db), 

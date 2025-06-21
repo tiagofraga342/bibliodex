@@ -65,7 +65,7 @@ class LivroRead(LivroBase):
     autores: List[AutorReadBasic] = []
     model_config = ConfigDict(from_attributes=True)
 
-class CategoriaRead(CategoriaBase):
+class CategoriaRead(CategoriaBase): # deu problema (internal server error), troquei para CategoriaReadBasic
     id_categoria: int
     livros: List[LivroReadBasic] = []
     model_config = ConfigDict(from_attributes=True)
@@ -263,4 +263,9 @@ class PenalidadeRead(PenalidadeBase):
     usuario: UsuarioReadBasic
     emprestimo_relacionado: Optional[EmprestimoReadBasic] = None
     model_config = ConfigDict(from_attributes=True)
+
+# --- Paginação Schemas ---
+class PaginatedLivros(BaseModel):
+    total: int
+    items: List[LivroRead]
 

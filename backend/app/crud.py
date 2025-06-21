@@ -135,7 +135,7 @@ def get_categoria(db: Session, categoria_id: int) -> Optional[models.Categoria]:
 def get_categorias(db: Session, skip: int = 0, limit: int = 100) -> List[models.Categoria]:
     logger.debug(f"Buscando categorias com skip: {skip}, limit: {limit}")
     return db.query(models.Categoria).options(
-        selectinload(models.Categoria.livros)
+        #selectinload(models.Categoria.livros)
     ).offset(skip).limit(limit).all()
 
 def create_categoria(db: Session, categoria: schemas.CategoriaCreate) -> models.Categoria:
@@ -947,4 +947,39 @@ def update_reserva(db: Session, reserva_id: int, reserva_update: schemas.Reserva
     db.refresh(reserva)
     logger.info(f"Reserva ID {reserva_id} atualizada com sucesso.")
     return reserva
+
+def get_livros_paginados(
+    db: Session,
+    skip: int = 0,
+    limit: int = 20,
+    titulo: str = None,
+    autor: str = None,
+    categoria_id: int = None,
+    sort_by: str = "titulo",
+    sort_dir: str = "asc"
+):
+    """
+    Retorna um dicionário com total de livros e os livros da página atual.
+    """
+    query = db.query(models.Livro)
+    if titulo:
+        query = query.filter(models.Livro.titulo.ilike(f"%{titulo}%"))
+    if categoria_id:
+        query = query.filter(models.Livro.id_categoria == categoria_id)
+    if autor:
+        query = query.join(models.Livro.autores).filter(models.Autor.nome.ilike(f"%{autor}%"))
+    total = query.count()
+    # Reaplica os joins para eager loading
+    query = query.options(
+        joinedload(models.Livro.categoria),
+        selectinload(models.Livro.autores)
+    )
+    sort_col = getattr(models.Livro, sort_by, models.Livro.titulo)
+    if sort_dir == "desc":
+        sort_col = sort_col.desc()
+    else:
+        sort_col = sort_col.asc()
+    query = query.order_by(sort_col)
+    items = query.offset(skip).limit(limit).all()
+    return {"total": total, "items": items}
 

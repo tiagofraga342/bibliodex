@@ -7,10 +7,7 @@ from app.database import get_db
 from app import crud, schemas, models
 from app.routers.auth import get_current_active_funcionario
 
-router = APIRouter(
-    prefix="/devolucoes",
-    tags=["Devoluções"]
-)
+router = APIRouter(prefix="/devolucoes", tags=["Devoluções"])
 logger = logging.getLogger(__name__)
 
 @router.post("/", response_model=schemas.DevolucaoRead, status_code=status.HTTP_201_CREATED)
