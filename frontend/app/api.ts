@@ -171,26 +171,9 @@ const tryRefreshToken = async (): Promise<boolean> => {
   }
 };
 
-// --- Wrapper para lidar com 401, tentar refresh e timeout ---
-async function fetchWithAutoRefresh(
-  input: RequestInfo,
-  init?: RequestInit,
-  retry = true,
-  timeoutMs: number = 120_000 // 120 segundos por padrão
-): Promise<Response> {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeoutMs);
-  let response: Response;
-  try {
-    response = await fetch(input, { ...init, signal: controller.signal });
-  } catch (err: any) {
-    if (err.name === 'AbortError') {
-      throw new Error('Tempo limite de requisição excedido. Tente novamente.');
-    }
-    throw err;
-  } finally {
-    clearTimeout(id);
-  }
+// --- Wrapper para lidar com 401 e tentar refresh ---
+async function fetchWithAutoRefresh(input: RequestInfo, init?: RequestInit, retry = true): Promise<Response> {
+  let response = await fetch(input, init);
   if (response.status === 401 && retry) {
     // Tenta renovar o token
     const refreshed = await tryRefreshToken();
@@ -200,7 +183,8 @@ async function fetchWithAutoRefresh(
       if (token) {
         const headers = new Headers(init?.headers || {});
         headers.set("Authorization", `Bearer ${token}`);
-        return fetchWithAutoRefresh(input, { ...init, headers }, false, timeoutMs);
+        response = await fetch(input, { ...init, headers });
+        if (response.status !== 401) return response;
       }
     }
     // Se não conseguiu renovar, limpa tokens e redireciona para login
@@ -238,7 +222,7 @@ const handleApiError = async (response: Response, url: string) => {
 
 // --- API methods usando fetchWithAutoRefresh ---
 const api = {
-  get: async <T>(url: string, params?: any, timeoutMs?: number): Promise<{ data: T }> => {
+  get: async <T>(url: string, params?: any): Promise<{ data: T }> => {
     const token = getAuthToken();
     let fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
     if (params && typeof params === 'object') {
@@ -247,25 +231,26 @@ const api = {
     }
     const headers: Record<string, string> = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
-    const response = await fetchWithAutoRefresh(fullUrl, { headers }, true, timeoutMs);
+    const response = await fetchWithAutoRefresh(fullUrl, { headers });
     if (!response.ok) {
       await handleApiError(response, fullUrl);
     }
     const data = await response.json();
     return { data };
   },
-  post: async <T>(url: string, body: any, timeoutMs?: number): Promise<{ data: T }> => {
+
+  post: async <T>(url: string, body: any): Promise<{ data: T }> => {
     const token = getAuthToken();
     const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
     // Corrigir headers para envio de form-data no login
     if (url.endsWith('/auth/token') && body instanceof URLSearchParams) {
       const headers: Record<string, string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      const response = await fetchWithAutoRefresh(fullUrl, {
+      const response = await fetch(fullUrl, {
         method: 'POST',
         body,
         headers,
-      }, true, timeoutMs);
+      });
       if (!response.ok) {
         await handleApiError(response, fullUrl);
       }
@@ -282,7 +267,7 @@ const api = {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
-    }, true, timeoutMs);
+    });
     if (!response.ok) {
       await handleApiError(response, fullUrl);
     }
@@ -293,7 +278,8 @@ const api = {
     }
     return { data };
   },
-  put: async <T>(url: string, body: any, timeoutMs?: number): Promise<{ data: T }> => {
+
+  put: async <T>(url: string, body: any): Promise<{ data: T }> => {
     const token = getAuthToken();
     const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -302,14 +288,15 @@ const api = {
       method: 'PUT',
       headers,
       body: JSON.stringify(body),
-    }, true, timeoutMs);
+    });
     if (!response.ok) {
       await handleApiError(response, fullUrl);
     }
     const data = await response.json();
     return { data };
   },
-  delete: async <T>(url: string, timeoutMs?: number): Promise<{ data: T }> => {
+
+  delete: async <T>(url: string): Promise<{ data: T }> => {
     const token = getAuthToken();
     const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
     const headers: Record<string, string> = {};
@@ -317,7 +304,7 @@ const api = {
     const response = await fetchWithAutoRefresh(fullUrl, {
       method: 'DELETE',
       headers,
-    }, true, timeoutMs);
+    });
     if (!response.ok) {
       await handleApiError(response, fullUrl);
     }
@@ -345,8 +332,7 @@ export async function fetchLivros(params: {
   const cleanParams = Object.fromEntries(
     Object.entries(params).filter(([_, v]) => v !== undefined && v !== null)
   );
-  // Timeout de 120s para buscas de livros
-  return api.get<PaginatedLivros>("/livros", cleanParams, 120_000);
+  return api.get<PaginatedLivros>("/livros", cleanParams);
 }
 
 // Exemplo de função para buscar usuários por nome (autocomplete)
