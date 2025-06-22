@@ -64,13 +64,10 @@ def create_emprestimo(db: Session, emprestimo: schemas.EmprestimoCreate):
         logger.warning(f"Funcionário de registro com id {emprestimo.id_funcionario_registro} está inativo.")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Funcionário de registro com id {emprestimo.id_funcionario_registro} está inativo.")
     db_emprestimo = models.Emprestimo(**emprestimo.model_dump())
-    db_exemplar.status = "emprestado"
     db.add(db_emprestimo)
-    db.add(db_exemplar)
     db.commit()
     db.refresh(db_emprestimo)
-    db.refresh(db_exemplar)
-    logger.info(f"Empréstimo ID {db_emprestimo.id_emprestimo} criado com sucesso. Exemplar Nº Tombo {db_exemplar.numero_tombo} status atualizado para 'emprestado'.")
+    logger.info(f"Empréstimo ID {db_emprestimo.id_emprestimo} criado com sucesso. Exemplar Nº Tombo {db_exemplar.numero_tombo} status atualizado.")
     return db_emprestimo
 
 def get_emprestimos_by_usuario_id(db: Session, usuario_id: int, skip: int = 0, limit: int = 100):
@@ -99,3 +96,12 @@ def delete_emprestimo(db: Session, emprestimo_id: int):
     db.commit()
     logger.info(f"Empréstimo com id {emprestimo_id} excluído com sucesso.")
     return db_emprestimo
+
+def marcar_emprestimo_como_devolvido(db: Session, id_emprestimo: int):
+    emprestimo = db.query(models.Emprestimo).filter(models.Emprestimo.id_emprestimo == id_emprestimo).first()
+    if not emprestimo:
+        raise HTTPException(status_code=404, detail="Empréstimo não encontrado")
+    emprestimo.status = "devolvido"
+    db.commit()
+    db.refresh(emprestimo)
+    return emprestimo

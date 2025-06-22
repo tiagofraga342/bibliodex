@@ -6,6 +6,7 @@ import logging
 from app.database import get_db
 from app import crud, schemas, models
 from app.routers.auth import get_current_active_funcionario
+from app.crud.crud_emprestimo import marcar_emprestimo_como_devolvido  # Importação direta
 
 router = APIRouter(prefix="/devolucoes", tags=["Devoluções"])
 logger = logging.getLogger(__name__)
@@ -21,7 +22,7 @@ def registrar_devolucao(
     try:
         nova_devolucao = crud.create_devolucao(db, devolucao_data)
         # Atualiza status do empréstimo e exemplar
-        crud.marcar_emprestimo_como_devolvido(db, devolucao.id_emprestimo)
+        marcar_emprestimo_como_devolvido(db, devolucao.id_emprestimo)
         logger.info(f"Devolução ID {nova_devolucao.id_devolucao} registrada com sucesso para empréstimo ID {devolucao.id_emprestimo}.")
         return nova_devolucao
     except HTTPException as e:

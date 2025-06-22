@@ -92,13 +92,15 @@ export default function LivroList({ livros, isAuthenticated, abrirModalEmprestim
           {/* Resumo de exemplares */}
           {(typeof livro.total_exemplares === 'number' && typeof livro.exemplares_disponiveis === 'number') ? (
             <span className="text-gray-600 text-sm">
-              {`${livro.exemplares_disponiveis} disponível(is) de ${livro.total_exemplares} exemplar(es)`}
+              {`${String(livro.status_geral).trim().toLowerCase() === 'descatalogado' ? 0 : livro.exemplares_disponiveis} disponível(is) de ${livro.total_exemplares} exemplar(es)`}
             </span>
           ) : Array.isArray(livro.exemplares) && livro.exemplares.length > 0 && (
             <span className="text-gray-600 text-sm">
               {(() => {
                 const total = livro.exemplares.length;
-                const disponiveis = livro.exemplares.filter((ex: any) => ex.status === 'disponivel').length;
+                const disponiveis = String(livro.status_geral).trim().toLowerCase() === 'descatalogado'
+                  ? 0
+                  : livro.exemplares.filter((ex: any) => ex.status === 'disponivel').length;
                 const locais = livro.exemplares
                   .filter((ex: any) => ex.status === 'disponivel' && ex.localizacao)
                   .map((ex: any) => ex.localizacao)
@@ -112,16 +114,22 @@ export default function LivroList({ livros, isAuthenticated, abrirModalEmprestim
               {user?.role === "funcionario" && (
                 <button
                   className={
-                    (livro.status_geral === "descatalogado" || livro.exemplares_disponiveis === 0)
+                    (livro.status_geral === "descatalogado" ||
+                      !Array.isArray(livro.exemplares) ||
+                      !livro.exemplares.some((ex: any) => ex.status === "disponivel"))
                       ? "px-3 py-1 bg-blue-300 text-gray-700 rounded w-fit cursor-not-allowed opacity-60"
                       : "px-3 py-1 bg-blue-700 text-white rounded hover:bg-blue-800 w-fit"
                   }
                   onClick={() => abrirModalEmprestimo(livro)}
-                  disabled={livro.status_geral === "descatalogado" || livro.exemplares_disponiveis === 0}
+                  disabled={
+                    String(livro.status_geral).trim().toLowerCase() === "descatalogado" ||
+                    !Array.isArray(livro.exemplares) ||
+                    !livro.exemplares.some((ex: any) => ex.status === "disponivel")
+                  }
                   title={
-                    livro.status_geral === "descatalogado"
+                    String(livro.status_geral).trim().toLowerCase() === "descatalogado"
                       ? "Não é permitido emprestar livros descatalogados."
-                      : livro.exemplares_disponiveis === 0
+                      : !Array.isArray(livro.exemplares) || !livro.exemplares.some((ex: any) => ex.status === "disponivel")
                         ? "Não há exemplares disponíveis para empréstimo."
                         : undefined
                   }

@@ -313,6 +313,15 @@ function ReservasPage() {
       setMensagem("Dados da reserva incompletos para empréstimo.");
       return;
     }
+    // Permite empréstimo se status for 'disponivel' OU 'reservado'
+    const status = reserva.exemplar.status;
+    const podeEmprestar = Array.isArray(status)
+      ? (status.includes("disponivel") || status.includes("reservado"))
+      : (status === "disponivel" || status === "reservado");
+    if (!podeEmprestar) {
+      setMensagem("Este exemplar não está disponível para empréstimo.");
+      return;
+    }
     try {
       // Calcular datas
       const hoje = new Date();
@@ -540,8 +549,30 @@ function ReservasPage() {
                   {/* Emprestar: apenas para funcionário, reserva ativa */}
                   {authUser?.role === "funcionario" && r.status === "ativa" && (
                     <button
-                      className="px-3 py-1 bg-green-700 text-white rounded hover:bg-green-800 text-xs"
-                      onClick={() => efetivarEmprestimo(r)}
+                      className={
+                        (Array.isArray(r.exemplar?.status)
+                          ? (r.exemplar.status.includes("disponivel") || r.exemplar.status.includes("reservado"))
+                          : (r.exemplar?.status === "disponivel" || r.exemplar?.status === "reservado"))
+                          ? "px-3 py-1 bg-green-700 text-white rounded hover:bg-green-800 text-xs"
+                          : "px-3 py-1 bg-gray-300 text-gray-500 rounded text-xs cursor-not-allowed opacity-60"
+                      }
+                      onClick={() =>
+                        (Array.isArray(r.exemplar?.status)
+                          ? (r.exemplar.status.includes("disponivel") || r.exemplar.status.includes("reservado"))
+                          : (r.exemplar?.status === "disponivel" || r.exemplar?.status === "reservado")) && efetivarEmprestimo(r)
+                      }
+                      disabled={
+                        !(Array.isArray(r.exemplar?.status)
+                          ? (r.exemplar.status.includes("disponivel") || r.exemplar.status.includes("reservado"))
+                          : (r.exemplar?.status === "disponivel" || r.exemplar?.status === "reservado"))
+                      }
+                      title={
+                        !(Array.isArray(r.exemplar?.status)
+                          ? (r.exemplar.status.includes("disponivel") || r.exemplar.status.includes("reservado"))
+                          : (r.exemplar?.status === "disponivel" || r.exemplar?.status === "reservado"))
+                          ? "Este exemplar não está disponível para empréstimo."
+                          : undefined
+                      }
                     >Emprestar</button>
                   )}
                   {/* Cancelar: funcionário OU usuário dono da reserva, se ativa */}
@@ -668,8 +699,13 @@ function ReservasPage() {
               <svg className="w-6 h-6 text-blue-700" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
               Detalhes da Reserva
             </h2>
-            <div className="mb-2"><b>Exemplar:</b> Nº Tombo: {modalDetalhes.exemplar?.numero_tombo ?? <span className="text-gray-400">—</span>}{modalDetalhes.exemplar?.codigo_identificacao ? ` | Código de Barras: ${modalDetalhes.exemplar.codigo_identificacao}` : ""}</div>
-            <div className="mb-2"><b>Livro:</b> {modalDetalhes.livro?.titulo ?? <span className="text-gray-400">—</span>}</div>
+            <div className="mb-2">
+              <b>Exemplar:</b> Nº Tombo: {modalDetalhes.exemplar?.numero_tombo ?? <span className="text-gray-400">—</span>}
+              {modalDetalhes.exemplar?.codigo_identificacao ? ` | Código de Barras: ${modalDetalhes.exemplar.codigo_identificacao}` : ""}
+            </div>
+            <div className="mb-2">
+              <b>Livro:</b> {modalDetalhes.livro?.titulo || modalDetalhes.exemplar?.livro?.titulo || <span className="text-gray-400">—</span>}
+            </div>
             <div className="mb-2"><b>Autor(es):</b> {modalDetalhes.livro?.autores && modalDetalhes.livro.autores.length > 0 ? modalDetalhes.livro.autores.map(a => a.nome).join(", ") : "Desconhecido"}</div>
             <div className="mb-2"><b>Usuário:</b> {modalDetalhes.usuario.nome}</div>
             <div className="mb-2"><b>Data da Reserva:</b> {modalDetalhes.data_reserva}</div>

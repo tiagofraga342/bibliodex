@@ -60,7 +60,6 @@ def listar_exemplares_endpoint(
         exemplares = crud.get_exemplares_por_livro(db, livro_id=livro_id, skip=skip, limit=limit)
     else:
         exemplares = crud.get_exemplares(db, skip=skip, limit=limit)
-    # Buscar data_prevista_devolucao para cada exemplar (se emprestado)
     exemplares_with_devolucao = []
     for ex in exemplares:
         data_prevista_devolucao = None

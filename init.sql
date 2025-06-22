@@ -144,8 +144,7 @@ CREATE TABLE IF NOT EXISTS reserva (
     data_reserva DATE NOT NULL,
     data_validade_reserva DATE NOT NULL,
     status VARCHAR DEFAULT 'ativa' NOT NULL, -- Status: ativa, cancelada, expirada, atendida
-    numero_tombo INTEGER, -- Pode ser nulo se for reserva de título
-    id_livro_solicitado INTEGER, -- Para reservas genéricas de um título
+    numero_tombo INTEGER NOT NULL, -- Agora obrigatório
     id_usuario INTEGER NOT NULL,
     id_funcionario_registro INTEGER, -- Funcionário que auxiliou no registro
     CONSTRAINT fk_reserva_usuario
@@ -155,20 +154,14 @@ CREATE TABLE IF NOT EXISTS reserva (
     CONSTRAINT fk_reserva_exemplar
         FOREIGN KEY(numero_tombo)
         REFERENCES exemplar(numero_tombo)
-        ON DELETE SET NULL, -- Se exemplar for deletado, a reserva pode ficar sem exemplar específico
-    CONSTRAINT fk_reserva_livro_solicitado
-        FOREIGN KEY(id_livro_solicitado)
-        REFERENCES livro(id_livro)
-        ON DELETE CASCADE, -- Se o livro for deletado, reservas para ele são canceladas/deletadas
+        ON DELETE RESTRICT, -- Não pode deletar exemplar com reserva
     CONSTRAINT fk_reserva_funcionario
         FOREIGN KEY(id_funcionario_registro)
         REFERENCES funcionario(id_funcionario)
-        ON DELETE SET NULL,
-    CONSTRAINT chk_reserva_item CHECK (numero_tombo IS NOT NULL OR id_livro_solicitado IS NOT NULL) -- Garante que ou exemplar ou livro é referenciado
+        ON DELETE SET NULL
 );
 COMMENT ON TABLE reserva IS 'Tabela para registrar as reservas de livros/exemplares.';
 COMMENT ON COLUMN reserva.status IS 'Status: ativa, cancelada, expirada, atendida';
-COMMENT ON COLUMN reserva.id_livro_solicitado IS 'Para reservas genéricas de um título';
 
 -- Tabela: devolucao
 CREATE TABLE IF NOT EXISTS devolucao (

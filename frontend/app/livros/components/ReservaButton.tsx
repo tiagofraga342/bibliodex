@@ -11,6 +11,13 @@ export default function ReservaButton({ livro, statusLivro, abrirModalReserva }:
   const podeReservar = status === "ativo" || status === "indisponivel";
   const desabilitado = !podeReservar;
 
+  // Desabilita o botão se todos os exemplares disponíveis estão reservados
+  const todosReservados = Array.isArray(livro.exemplares)
+    ? livro.exemplares.every((ex: any) => Array.isArray(ex.status)
+        ? ex.status.includes('reservado')
+        : ex.status === 'reservado')
+    : false;
+
   if (!isAuthenticated) return null;
   if (desabilitado) return (
     <button className="px-3 py-1 bg-yellow-300 text-gray-700 rounded w-fit cursor-not-allowed opacity-60" disabled>
@@ -20,8 +27,14 @@ export default function ReservaButton({ livro, statusLivro, abrirModalReserva }:
 
   return (
     <button
-      className="px-3 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700 w-fit disabled:opacity-60"
+      className={
+        todosReservados
+          ? "px-3 py-1 bg-gray-300 text-gray-700 rounded w-fit cursor-not-allowed opacity-60"
+          : "px-3 py-1 bg-green-700 text-white rounded hover:bg-green-800 w-fit"
+      }
       onClick={() => abrirModalReserva(livro)}
+      disabled={todosReservados}
+      title={todosReservados ? "Todos os exemplares deste livro já estão reservados." : undefined}
     >
       Reservar
     </button>

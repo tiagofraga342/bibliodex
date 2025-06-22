@@ -34,8 +34,12 @@ def create_devolucao(db: Session, devolucao: schemas.DevolucaoCreate):
     db_emprestimo.status_emprestimo = "devolvido"
     db_exemplar = db_emprestimo.exemplar
     if db_exemplar:
-        db_exemplar.status = "disponivel"
-        db.add(db_exemplar)
+        # Só permite devolução se status for 'emprestado' ou 'reservado'
+        if db_exemplar.status not in ["emprestado", "reservado"]:
+            logger.error(f"Tentativa de devolução de exemplar {db_exemplar.numero_tombo} com status inválido: {db_exemplar.status}")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Exemplar {db_exemplar.numero_tombo} não está emprestado nem reservado.")
+        # Removido: db_exemplar.status = "disponivel" e atualizações manuais
+        # O status será refletido automaticamente pela property dinâmica
     db.add(db_devolucao)
     db.add(db_emprestimo)
     db.commit()

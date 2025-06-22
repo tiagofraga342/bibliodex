@@ -69,6 +69,7 @@ export interface ExemplarReadBasic {
   observacoes?: string | null;
   localizacao?: string | null;
   id_livro: number;
+  livro?: LivroReadBasic; // Adicionado para garantir acesso ao título do livro
 }
 
 // --- Funcionario ---
@@ -353,11 +354,8 @@ export async function fetchUsuariosAutocomplete(params: {
 }
 
 // Cria uma reserva para o usuário autenticado
-export async function fetchCriarReserva({ id_livro, id_usuario }: { id_livro: number, id_usuario: number }) {
-  return api.post("/reservas", {
-    id_livro_solicitado: id_livro,
-    id_usuario
-  });
+export async function fetchCriarReserva(payload: any) {
+  return api.post("/reservas", payload);
 }
 
 export {

@@ -33,11 +33,6 @@ def create_exemplar(db: Session, exemplar: schemas.ExemplarCreate):
     if not db_livro:
         logger.error(f"Livro com id {exemplar.id_livro} não encontrado ao tentar criar exemplar {exemplar.codigo_identificacao}.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Livro com id {exemplar.id_livro} não encontrado.")
-    if db_livro.status_geral == "descatalogado" and exemplar.status == "disponivel":
-        logger.warning(f"Tentativa de criar exemplar disponível para livro descatalogado (ID: {exemplar.id_livro}).")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Não é permitido criar exemplar disponível para livro descatalogado.")
-    if db_livro.status_geral == "descatalogado":
-        exemplar.status = "descartado"
     db_exemplar_check = db.query(models.Exemplar).filter(models.Exemplar.codigo_identificacao == exemplar.codigo_identificacao).first()
     if db_exemplar_check:
         logger.warning(f"Exemplar com código de identificação {exemplar.codigo_identificacao} já existe.")

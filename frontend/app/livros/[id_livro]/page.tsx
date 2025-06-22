@@ -25,7 +25,10 @@ export default function LivroDetalhesPage({ params }: { params: Promise<{ id_liv
     return <div className="p-4">Carregando...</div>;
   }
 
-  function statusExemplarLabel(status: string) {
+  function statusExemplarLabel(status: string | string[]) {
+    if (Array.isArray(status)) {
+      return status.map(statusExemplarLabel).join(" e ");
+    }
     switch (status) {
       case "disponivel": return "Disponível";
       case "emprestado": return "Emprestado";

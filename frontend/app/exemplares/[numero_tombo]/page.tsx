@@ -25,7 +25,7 @@ export default function ExemplarDetalhePage({ params }: { params: Promise<{ nume
     <div className="max-w-2xl mx-auto mt-8 bg-white p-6 rounded shadow">
       <h1 className="text-2xl font-bold mb-4">Detalhes do Exemplar</h1>
       <div className="mb-2"><b>Número de Tombo:</b> {exemplar.numero_tombo}</div>
-      <div className="mb-2"><b>Status:</b> {exemplar.status}</div>
+      <div className="mb-2"><b>Status:</b> {Array.isArray(exemplar.status) ? exemplar.status.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' e ') : exemplar.status}</div>
       <div className="mb-2"><b>Localização:</b> {exemplar.localizacao || <span className="text-gray-400">—</span>}</div>
       {exemplar.livro && (
         <>

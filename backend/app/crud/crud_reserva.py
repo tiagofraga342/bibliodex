@@ -10,7 +10,6 @@ def get_reserva(db: Session, reserva_id: int):
     reserva = db.query(models.Reserva).options(
         joinedload(models.Reserva.usuario),
         joinedload(models.Reserva.exemplar).joinedload(models.Exemplar.livro),
-        joinedload(models.Reserva.livro_solicitado),
         joinedload(models.Reserva.funcionario_registro_reserva)
     ).filter(models.Reserva.id_reserva == reserva_id).first()
     if not reserva:
@@ -22,12 +21,11 @@ def get_reservas(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Reserva).options(
         joinedload(models.Reserva.usuario),
         joinedload(models.Reserva.exemplar).joinedload(models.Exemplar.livro),
-        joinedload(models.Reserva.livro_solicitado),
         joinedload(models.Reserva.funcionario_registro_reserva)
     ).order_by(models.Reserva.data_reserva.desc()).offset(skip).limit(limit).all()
 
 def create_reserva(db: Session, reserva: schemas.ReservaCreate):
-    logger.info(f"Tentando criar reserva para usuário ID {reserva.id_usuario}, numero_tombo {getattr(reserva, 'numero_tombo', None)}, livro ID {getattr(reserva, 'id_livro_solicitado', None)}")
+    logger.info(f"Tentando criar reserva para usuário ID {reserva.id_usuario}, numero_tombo {getattr(reserva, 'numero_tombo', None)}, livro ID {getattr(reserva, 'id_livro', None)}")
     db_usuario = db.query(models.Usuario).filter(models.Usuario.id_usuario == reserva.id_usuario).first()
     if not db_usuario:
         logger.error(f"Usuário com id {reserva.id_usuario} não encontrado ao criar reserva.")
@@ -45,15 +43,18 @@ def create_reserva(db: Session, reserva: schemas.ReservaCreate):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Funcionário de registro com id {reserva.id_funcionario_registro} está inativo.")
     numero_tombo = reserva.numero_tombo
     db_exemplar = None
+    # Permite reserva por numero_tombo OU por id_livro
     if not numero_tombo:
-        if not reserva.id_livro_solicitado:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="É obrigatório informar o numero_tombo do exemplar ou o id_livro_solicitado.")
+        if not reserva.id_livro:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="É obrigatório informar o numero_tombo do exemplar ou o id_livro do livro.")
+        # Seleciona exemplar disponível ou emprestado para o livro
         db_exemplar = db.query(models.Exemplar).filter(
-            models.Exemplar.id_livro == reserva.id_livro_solicitado,
-            models.Exemplar.status.in_(["disponivel", "emprestado"])
-        ).first()
+            models.Exemplar.id_livro == reserva.id_livro
+        ).all()
+        # Filtra exemplares disponíveis ou emprestados via property dinâmica
+        db_exemplar = next((ex for ex in db_exemplar if ex.status in ["disponivel", "emprestado"]), None)
         if not db_exemplar:
-            logger.warning(f"Nenhum exemplar disponível ou emprestado para o livro {reserva.id_livro_solicitado}.")
+            logger.warning(f"Nenhum exemplar disponível ou emprestado para o livro {reserva.id_livro}.")
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Não há exemplares disponíveis ou emprestados para reserva deste livro.")
         numero_tombo = db_exemplar.numero_tombo
     else:
@@ -71,8 +72,6 @@ def create_reserva(db: Session, reserva: schemas.ReservaCreate):
     if existing_active_reserva_exemplar and existing_active_reserva_exemplar.id_usuario != reserva.id_usuario:
          logger.warning(f"Exemplar {numero_tombo} já possui uma reserva ativa por outro usuário.")
          raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Exemplar {numero_tombo} já está reservado ativamente por outro usuário.")
-    db_exemplar.status = "reservado"
-    db.add(db_exemplar)
     import datetime
     hoje = datetime.date.today()
     data_reserva = reserva.data_reserva or hoje
@@ -95,11 +94,12 @@ def create_reserva(db: Session, reserva: schemas.ReservaCreate):
     reserva_data["numero_tombo"] = numero_tombo
     reserva_data["data_reserva"] = data_reserva
     reserva_data["data_validade_reserva"] = data_validade_reserva
+    # Remove id_livro pois não existe no modelo Reserva
+    reserva_data.pop("id_livro", None)
     db_reserva = models.Reserva(**reserva_data)
     db.add(db_reserva)
     db.commit()
     db.refresh(db_reserva)
-    # Adiciona info extra na resposta (data_prevista_devolucao_emprestimo)
     db_reserva.data_prevista_devolucao_emprestimo = data_prevista_devolucao_emprestimo
     logger.info(f"Reserva ID {db_reserva.id_reserva} criada com sucesso para exemplar {numero_tombo}.")
     return db_reserva
@@ -109,7 +109,6 @@ def get_reservas_by_usuario_id(db: Session, usuario_id: int, skip: int = 0, limi
     reservas = db.query(models.Reserva).options(
         joinedload(models.Reserva.usuario),
         joinedload(models.Reserva.exemplar).joinedload(models.Exemplar.livro).joinedload(models.Livro.autores),
-        joinedload(models.Reserva.livro_solicitado),
         joinedload(models.Reserva.funcionario_registro_reserva)
     ).filter(models.Reserva.id_usuario == usuario_id).order_by(models.Reserva.data_reserva.desc()).offset(skip).limit(limit).all()
     reservas_read = []
@@ -117,8 +116,6 @@ def get_reservas_by_usuario_id(db: Session, usuario_id: int, skip: int = 0, limi
         livro = None
         if r.exemplar and r.exemplar.livro:
             livro = r.exemplar.livro
-        elif r.livro_solicitado:
-            livro = r.livro_solicitado
         reserva_dict = schemas.ReservaRead.model_validate(r).model_dump()
         if livro:
             reserva_dict["livro"] = schemas.LivroReadBasic.model_validate(livro).model_dump()
@@ -140,16 +137,6 @@ def delete_reserva(db: Session, reserva_id: int):
         db.delete(db_reserva)
         db.commit()
         logger.info(f"Reserva com id {reserva_id} (status: {db_reserva.status}) excluída com sucesso.")
-        if exemplar and exemplar.status == "reservado":
-            reserva_ativa = db.query(models.Reserva).filter(
-                models.Reserva.numero_tombo == exemplar.numero_tombo,
-                models.Reserva.status == "ativa"
-            ).first()
-            if not reserva_ativa:
-                exemplar.status = "disponivel"
-                db.add(exemplar)
-                db.commit()
-                logger.info(f"Exemplar {exemplar.numero_tombo} liberado (status 'disponivel') após exclusão/cancelamento de reserva.")
     else:
         logger.warning(f"Reserva com id {reserva_id} não encontrada para exclusão.")
     return db_reserva

@@ -139,17 +139,32 @@ export default function ReservaModal({
             onChange={e => setNumeroTomboSelecionado(e.target.value)}
           >
             <option value="">Selecione o exemplar (opcional)</option>
-            {modalReservaLivro.exemplaresDisponiveis && modalReservaLivro.exemplaresDisponiveis.map((ex: any) => {
-              let info = `Nº Tombo: ${ex.numero_tombo} | Localização: ${ex.localizacao || '-'}`;
-              if (ex.status === 'emprestado' && ex.data_prevista_devolucao) {
-                info += ` | Emprestado até: ${new Date(ex.data_prevista_devolucao).toLocaleDateString()}`;
-              }
-              return (
-                <option key={ex.numero_tombo} value={ex.numero_tombo}>
-                  {info}
-                </option>
-              );
-            })}
+            {modalReservaLivro.exemplaresDisponiveis && modalReservaLivro.exemplaresDisponiveis
+              .filter((ex: any) => {
+                // Permite reservar apenas se NÃO houver reserva ativa para o exemplar
+                if (Array.isArray(ex.status)) {
+                  return (ex.status.includes("disponivel") || ex.status.includes("emprestado")) && !ex.status.includes("reservado");
+                }
+                return (ex.status === "disponivel" || ex.status === "emprestado") && ex.status !== "reservado";
+              })
+              .map((ex: any) => {
+                let statusLabel = Array.isArray(ex.status)
+                  ? ex.status.map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(" e ")
+                  : ex.status.charAt(0).toUpperCase() + ex.status.slice(1);
+                let info = `Nº Tombo: ${ex.numero_tombo} | Localização: ${ex.localizacao || '-'}`;
+                info += ` | Status: ${statusLabel}`;
+                if ((Array.isArray(ex.status) ? ex.status.includes('emprestado') : ex.status === 'emprestado') && ex.data_prevista_devolucao) {
+                  info += ` | Emprestado até: ${new Date(ex.data_prevista_devolucao).toLocaleDateString()}`;
+                }
+                if (Array.isArray(ex.status) && ex.status.includes('reservado')) {
+                  info += ' | Já reservado para outro usuário';
+                }
+                return (
+                  <option key={ex.numero_tombo} value={ex.numero_tombo}>
+                    {info}
+                  </option>
+                );
+              })}
           </select>
         </label>
         <div className="flex gap-2 justify-end">

@@ -211,7 +211,7 @@ class ReservaBase(BaseModel):
     data_validade_reserva: Optional[date] = None
     status: str = Field(default="ativa", comment="Status: ativa, cancelada, expirada, atendida")
     numero_tombo: Optional[int] = None
-    id_livro_solicitado: Optional[int] = None
+    id_livro: Optional[int] = None
     id_usuario: int
     id_funcionario_registro: Optional[int] = None
 
@@ -226,7 +226,7 @@ class ReservaRead(ReservaBase):
     id_reserva: int
     usuario: UsuarioReadBasic
     exemplar: Optional[ExemplarReadBasic] = None
-    livro: Optional[LivroReadBasic] = None # Corresponde a id_livro_solicitado
+    livro: Optional[LivroReadBasic] = None
     funcionario_registro_reserva: Optional[FuncionarioReadBasic] = None
     data_prevista_devolucao_emprestimo: Optional[date] = None
     model_config = ConfigDict(from_attributes=True)

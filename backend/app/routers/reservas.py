@@ -133,20 +133,6 @@ def cancelar_reserva_usuario(
     reserva.status = "cancelada"
     db.add(reserva)
     db.commit()  # Commita imediatamente para garantir que a reserva não é mais "ativa"
-    # Libera exemplar se não houver outra reserva ativa para ele
-    if reserva.numero_tombo:
-        exemplar = db.query(models.Exemplar).filter(models.Exemplar.numero_tombo == reserva.numero_tombo).first()
-        if exemplar and exemplar.status == "reservado":
-            reserva_ativa = db.query(models.Reserva).filter(
-                models.Reserva.numero_tombo == exemplar.numero_tombo,
-                models.Reserva.status == "ativa"
-            ).first()
-            if not reserva_ativa:
-                exemplar.status = "disponivel"
-                db.add(exemplar)
-                db.commit()
-                db.refresh(exemplar)
-                logger.info(f"Status do exemplar {exemplar.numero_tombo} após cancelamento: {exemplar.status}")
     db.refresh(reserva)
     logger.info(f"Reserva ID {reserva_id} cancelada pelo usuário '{current_user.matricula}'.")
     return reserva
