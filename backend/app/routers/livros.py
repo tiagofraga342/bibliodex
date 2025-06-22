@@ -2,10 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
 from sqlalchemy.orm import Session
 from app.database import get_db
-import app.crud as crud
+from app.crud import *
 import app.schemas as schemas # Adicionado import de schemas
 from app.routers.auth import get_current_active_funcionario # Proteção
 from app import models # Para current_funcionario type hint
+from app import crud
+from app.schemas_extra import ExemplarWithDevolucao
 import logging # Import logging
 
 router = APIRouter()
@@ -19,13 +21,16 @@ def listar_livros(
     titulo: str = None,
     autor: str = None,
     categoria_id: int = None,
+    isbn: str = None,
+    editora: str = None,
+    ano_publicacao: int = None,
     sort_by: str = "titulo",
     sort_dir: str = "asc"
 ):
     """
     Listar livros com paginação, filtro e ordenação, retornando total e items.
     """
-    logger.info(f"Listando livros com skip={skip}, limit={limit}, titulo={titulo}, autor={autor}, categoria_id={categoria_id}, sort_by={sort_by}, sort_dir={sort_dir}")
+    logger.info(f"Listando livros com skip={skip}, limit={limit}, titulo={titulo}, autor={autor}, categoria_id={categoria_id}, isbn={isbn}, editora={editora}, ano_publicacao={ano_publicacao}, sort_by={sort_by}, sort_dir={sort_dir}")
     result = crud.get_livros_paginados(
         db,
         skip=skip,
@@ -33,6 +38,9 @@ def listar_livros(
         titulo=titulo,
         autor=autor,
         categoria_id=categoria_id,
+        isbn=isbn,
+        editora=editora,
+        ano_publicacao=ano_publicacao,
         sort_by=sort_by,
         sort_dir=sort_dir
     )
@@ -84,16 +92,44 @@ def excluir_livro(
     logger.info(f"Livro ID {livro_id} excluído (ou tentativa de exclusão processada) por '{current_funcionario.matricula_funcional}'.")
     return None
 
-@router.get("/{livro_id}/exemplares", response_model=List[schemas.ExemplarReadBasic])
+@router.get("/{livro_id}/exemplares", response_model=List[ExemplarWithDevolucao])
 def listar_exemplares_por_livro(
     livro_id: int,
     db: Session = Depends(get_db),
     current_funcionario: models.Funcionario = Depends(get_current_active_funcionario)
 ):
     """
-    Retorna todos os exemplares de um livro específico.
+    Retorna todos os exemplares de um livro específico, incluindo data prevista de devolução se emprestado.
     """
     logger.info(f"Listando exemplares para livro ID {livro_id}")
     exemplares = db.query(models.Exemplar).filter(models.Exemplar.id_livro == livro_id).all()
-    logger.debug(f"Encontrados {len(exemplares)} exemplares para o livro ID {livro_id}")
-    return exemplares
+    exemplares_with_devolucao = []
+    for ex in exemplares:
+        data_prevista_devolucao = None
+        if ex.status == "emprestado":
+            emprestimo_ativo = db.query(models.Emprestimo).filter(
+                models.Emprestimo.numero_tombo == ex.numero_tombo,
+                models.Emprestimo.status_emprestimo == "ativo"
+            ).order_by(models.Emprestimo.data_prevista_devolucao.desc()).first()
+            if emprestimo_ativo:
+                data_prevista_devolucao = emprestimo_ativo.data_prevista_devolucao
+        ex_dict = ExemplarWithDevolucao.model_validate(ex).model_dump()
+        ex_dict["data_prevista_devolucao"] = data_prevista_devolucao
+        exemplares_with_devolucao.append(ex_dict)
+    logger.debug(f"Encontrados {len(exemplares_with_devolucao)} exemplares para o livro ID {livro_id}")
+    return exemplares_with_devolucao
+
+@router.put("/{livro_id}", response_model=schemas.LivroRead)
+def atualizar_livro(
+    livro_id: int,
+    livro_update: schemas.LivroUpdate,
+    db: Session = Depends(get_db),
+    current_funcionario: models.Funcionario = Depends(get_current_active_funcionario)
+):
+    logger.info(f"Funcionário '{current_funcionario.matricula_funcional}' tentando atualizar livro ID: {livro_id}")
+    livro = crud.update_livro(db, livro_id, livro_update)
+    if not livro:
+        logger.warning(f"Livro ID {livro_id} não encontrado para atualização.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Livro não encontrado")
+    logger.info(f"Livro ID {livro_id} atualizado com sucesso.")
+    return livro

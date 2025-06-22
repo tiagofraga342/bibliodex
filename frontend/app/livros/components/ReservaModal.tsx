@@ -1,3 +1,5 @@
+"use client";
+
 import React from "react";
 
 interface ReservaModalProps {
@@ -16,6 +18,7 @@ interface ReservaModalProps {
   dropdownUsuarioReservaAberto: boolean;
   setDropdownUsuarioReservaAberto: (v: boolean) => void;
   dropdownUsuarioReservaRef: React.RefObject<HTMLDivElement>;
+  setMensagemReserva: (v: string) => void;
 }
 
 export default function ReservaModal({
@@ -33,65 +36,127 @@ export default function ReservaModal({
   modalReservaRef,
   dropdownUsuarioReservaAberto,
   setDropdownUsuarioReservaAberto,
-  dropdownUsuarioReservaRef
+  dropdownUsuarioReservaRef,
+  setMensagemReserva
 }: ReservaModalProps) {
+  const [numeroTomboSelecionado, setNumeroTomboSelecionado] = React.useState("");
+
+  React.useEffect(() => {
+    setNumeroTomboSelecionado("");
+  }, [modalReservaLivro]);
+
+  React.useEffect(() => {
+    if (!modalReservaLivro) return;
+    if (authUser?.role === 'funcionario' && buscaUsuarioReserva.trim().length > 0) {
+      // Busca usuário por matrícula diretamente na API
+      (async () => {
+        try {
+          const res = await import('../../api').then(m => m.default.get<any[]>(`/usuarios`, { matricula: buscaUsuarioReserva.trim() }));
+          const usuario = Array.isArray(res.data) && res.data.length > 0 ? res.data[0] : null;
+          if (usuario) {
+            setUsuarioId(String(usuario.id_usuario));
+            setUsuariosFiltradosReserva([usuario]);
+          } else {
+            setUsuarioId("");
+            setUsuariosFiltradosReserva([]);
+          }
+        } catch {
+          setUsuarioId("");
+          setUsuariosFiltradosReserva([]);
+        }
+      })();
+    } else {
+      setUsuarioId("");
+      setUsuariosFiltradosReserva([]);
+    }
+  }, [modalReservaLivro, buscaUsuarioReserva, authUser, setUsuarioId, setUsuariosFiltradosReserva]);
+
+  function handleReservaInterno(e: React.FormEvent) {
+    e.preventDefault();
+    // Passar o exemplar selecionado para o handler de reserva via closure
+    (handleReserva as any)(e, numeroTomboSelecionado);
+  }
+
   if (!modalReservaLivro) return null;
+
   return (
-    <dialog ref={modalReservaRef} className="rounded-lg p-0 w-full max-w-md">
-      <form method="dialog" onSubmit={handleReserva} className="flex flex-col gap-4 p-6 bg-white">
+    <dialog
+      ref={modalReservaRef}
+      className="rounded-lg p-0 w-full max-w-md"
+      style={{
+        position: 'fixed',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        zIndex: 50,
+        background: 'rgba(255,255,255,1)'
+      }}
+    >
+      <form method="dialog" onSubmit={handleReservaInterno} className="flex flex-col gap-4 p-6 bg-white">
         <h2 className="text-xl font-bold mb-2 text-gray-900">Reservar livro</h2>
         <div>
           <span className="font-semibold">Livro selecionado:</span> {modalReservaLivro.titulo} <br />
-          <span className="font-semibold">Autor:</span> {modalReservaLivro.autores.map((a: any) => a.nome).join(", ")}
+          <span className="font-semibold">Autor(es):</span> {Array.isArray(modalReservaLivro.autores) && modalReservaLivro.autores.length > 0
+            ? modalReservaLivro.autores.map((a: any) => a.nome).join(", ")
+            : "Desconhecido"}
         </div>
         {authUser?.role === 'funcionario' ? (
           <label className="font-semibold text-gray-900">
-            Usuário:
-            <div className="relative" ref={dropdownUsuarioReservaRef}>
-              <input
-                type="text"
-                className="w-full p-2 border border-gray-400 rounded mt-1"
-                placeholder="Digite o nome do usuário"
-                value={buscaUsuarioReserva}
-                onChange={e => {
-                  setBuscaUsuarioReserva(e.target.value);
+            Matrícula do usuário:
+            <input
+              type="text"
+              className="w-full p-2 border border-gray-400 rounded mt-1"
+              placeholder="Digite a matrícula do usuário"
+              value={buscaUsuarioReserva}
+              onChange={async (e) => {
+                setBuscaUsuarioReserva(e.target.value);
+                const matricula = e.target.value.trim();
+                if (matricula.length > 0) {
+                  try {
+                    const res = await import('../../api').then(m => m.default.get<any[]>(`/usuarios`, { matricula }));
+                    const usuario = Array.isArray(res.data) && res.data.length > 0 ? res.data[0] : null;
+                    if (usuario) {
+                      setUsuarioId(String(usuario.id_usuario));
+                    } else {
+                      setUsuarioId("");
+                    }
+                  } catch {
+                    setUsuarioId("");
+                  }
+                } else {
                   setUsuarioId("");
-                  setDropdownUsuarioReservaAberto(true);
-                }}
-                onFocus={() => setDropdownUsuarioReservaAberto(true)}
-                required
-              />
-              {dropdownUsuarioReservaAberto && buscaUsuarioReserva.length > 1 && usuariosFiltradosReserva.length > 0 && (
-                <ul className="border border-gray-300 rounded bg-white mt-1 max-h-32 overflow-y-auto z-10 absolute left-0 right-0">
-                  {usuariosFiltradosReserva.map(usuario => (
-                    <li
-                      key={usuario.id_usuario}
-                      className={`px-2 py-1 cursor-pointer hover:bg-blue-100 ${usuarioId === String(usuario.id_usuario) ? 'bg-blue-200' : ''}`}
-                      onMouseDown={e => e.preventDefault()}
-                      onClick={() => {
-                        setUsuarioId(String(usuario.id_usuario));
-                        setBuscaUsuarioReserva(usuario.nome);
-                        setUsuariosFiltradosReserva([]);
-                        setDropdownUsuarioReservaAberto(false);
-                      }}
-                    >
-                      {usuario.nome} <span className="text-xs text-gray-500">({usuario.role})</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+                }
+              }}
+              autoComplete="off"
+            />
           </label>
-        ) : (
-          <div>
-            <span className="font-semibold">Usuário:</span> {authUser?.nome || authUser?.sub}
-          </div>
-        )}
+        ) : null}
+        <label className="font-semibold text-gray-900 mt-2">
+          Exemplar a reservar (opcional):
+          <select
+            className="w-full p-2 border border-gray-400 rounded mt-1"
+            value={numeroTomboSelecionado}
+            onChange={e => setNumeroTomboSelecionado(e.target.value)}
+          >
+            <option value="">Selecione o exemplar (opcional)</option>
+            {modalReservaLivro.exemplaresDisponiveis && modalReservaLivro.exemplaresDisponiveis.map((ex: any) => {
+              let info = `Nº Tombo: ${ex.numero_tombo} | Localização: ${ex.localizacao || '-'}`;
+              if (ex.status === 'emprestado' && ex.data_prevista_devolucao) {
+                info += ` | Emprestado até: ${new Date(ex.data_prevista_devolucao).toLocaleDateString()}`;
+              }
+              return (
+                <option key={ex.numero_tombo} value={ex.numero_tombo}>
+                  {info}
+                </option>
+              );
+            })}
+          </select>
+        </label>
         <div className="flex gap-2 justify-end">
           <button type="button" className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300" onClick={fecharModalReserva}>Cancelar</button>
           <button type="submit" className="px-3 py-1 rounded bg-blue-700 text-white hover:bg-blue-800">Confirmar</button>
         </div>
-        {mensagemReserva && <div className="text-center text-sm text-red-600">{mensagemReserva}</div>}
+        {mensagemReserva && <div className="text-center text-sm text-red-600 flex justify-center items-center min-h-[2.5rem]">{mensagemReserva}</div>}
       </form>
     </dialog>
   );

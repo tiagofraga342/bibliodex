@@ -23,6 +23,7 @@ function ReservasPage() {
   const [usuariosFiltradosModal, setUsuariosFiltradosModal] = useState<User[]>([]);
   const [buscaLivroModal, setBuscaLivroModal] = useState("");
   const [livrosFiltradosModal, setLivrosFiltradosModal] = useState<Livro[]>([]);
+  const [modalDetalhes, setModalDetalhes] = useState<Reserva | null>(null);
 
   // Estados e refs para dropdowns dos filtros
   const [isDropdownUsuarioOpen, setIsDropdownUsuarioOpen] = useState(false);
@@ -307,6 +308,33 @@ function ReservasPage() {
     }
   }
 
+  async function efetivarEmprestimo(reserva: Reserva) {
+    if (!reserva || !reserva.exemplar || !reserva.usuario) {
+      setMensagem("Dados da reserva incompletos para empréstimo.");
+      return;
+    }
+    try {
+      // Calcular datas
+      const hoje = new Date();
+      const data_retirada = hoje.toISOString().slice(0, 10);
+      const data_prevista_devolucao = new Date(hoje.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10); // 7 dias
+      const payload = {
+        numero_tombo: reserva.exemplar.numero_tombo,
+        id_usuario: reserva.usuario.id_usuario,
+        data_retirada,
+        data_prevista_devolucao
+      };
+      await api.post('/emprestimos', payload);
+      setMensagem("Empréstimo realizado com sucesso!");
+      // Atualiza status da reserva para 'atendida' na UI
+      setReservas(rs => rs.map(r => r.id_reserva === reserva.id_reserva ? { ...r, status: "atendida" } : r));
+      setTimeout(() => setMensagem(""), 2000);
+    } catch (error) {
+      console.error("Erro ao efetivar empréstimo:", error);
+      setMensagem("Falha ao efetivar empréstimo.");
+    }
+  }
+
   return (
     <div className="max-w-5xl mx-auto mt-8 bg-white p-6 rounded shadow">
       <h1 className="text-2xl font-bold mb-6 text-gray-900">Gestão de Reservas</h1>
@@ -465,7 +493,7 @@ function ReservasPage() {
           {/* Table Head */}
           <thead className="bg-blue-100">
             <tr>
-              <th className="px-4 py-2 text-left">Livro</th>
+              <th className="px-4 py-2 text-left">Exemplar</th>
               <th className="px-4 py-2 text-left">Usuário</th>
               <th className="px-4 py-2 text-left">Data da Reserva</th>
               <th className="px-4 py-2 text-left">Status</th>
@@ -477,21 +505,23 @@ function ReservasPage() {
             {filtrarReservas().map(r => (
               <tr key={r.id_reserva} className="border-t border-gray-200 hover:bg-gray-50">
                 <td className="px-4 py-2">
-                  {r.livro
-                    ? (
-                        <>
-                          {r.livro.titulo}{" "}
-                          <span className="text-xs text-gray-500">
-                            {Array.isArray(r.livro.autores) && r.livro.autores.length > 0
-                              ? `(${r.livro.autores.map((a) => a.nome).join(", ")})`
-                              : ""}
-                          </span>
-                        </>
-                      )
-                    : <span className="text-gray-400 italic">Livro não disponível</span>
-                  }
+                  {r.exemplar?.numero_tombo || r.exemplar?.codigo_identificacao ? (
+                    <span
+                      className="text-blue-700 underline hover:text-blue-900 cursor-pointer"
+                      title="Ver detalhes do exemplar"
+                      style={{ textDecoration: "underline" }}
+                      onClick={() => setModalDetalhes(r)}
+                    >
+                      Nº Tombo: {r.exemplar?.numero_tombo ?? "—"}{r.exemplar?.codigo_identificacao ? ` | Código de Barras: ${r.exemplar.codigo_identificacao}` : ""}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400 italic">—</span>
+                  )}
                 </td>
-                <td className="px-4 py-2">{r.usuario.nome} <span className="text-xs text-gray-500">({r.usuario.role || "-"})</span></td>
+                <td className="px-4 py-2">
+                  {r.usuario.nome}
+                  <span className="text-xs text-gray-500 ml-1">[{r.usuario.matricula}]</span>
+                </td>
                 <td className="px-4 py-2">{r.data_reserva}</td>
                 <td className="px-4 py-2">
                   <span className={
@@ -506,8 +536,15 @@ function ReservasPage() {
                     {statusReservaLabel(r.status)}
                   </span>
                 </td>
-                <td className="px-4 py-2">
-                  {/* Permite cancelar se for funcionário OU se for reserva do próprio usuário autenticado */}
+                <td className="px-4 py-2 flex flex-wrap gap-2 items-center">
+                  {/* Emprestar: apenas para funcionário, reserva ativa */}
+                  {authUser?.role === "funcionario" && r.status === "ativa" && (
+                    <button
+                      className="px-3 py-1 bg-green-700 text-white rounded hover:bg-green-800 text-xs"
+                      onClick={() => efetivarEmprestimo(r)}
+                    >Emprestar</button>
+                  )}
+                  {/* Cancelar: funcionário OU usuário dono da reserva, se ativa */}
                   {r.status === "ativa" && (
                     <>
                       {authUser?.role === "funcionario" ? (
@@ -620,6 +657,31 @@ function ReservasPage() {
                 <button type="submit" className="px-4 py-2 bg-blue-700 text-white rounded hover:bg-blue-800 font-semibold">Criar Reserva</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Modal de detalhes da reserva */}
+      {modalDetalhes && (
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
+          <div className="bg-white rounded shadow-lg p-6 min-w-[320px] max-w-[90vw]">
+            <h2 className="text-xl font-bold mb-2 text-blue-800 flex items-center gap-2">
+              <svg className="w-6 h-6 text-blue-700" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+              Detalhes da Reserva
+            </h2>
+            <div className="mb-2"><b>Exemplar:</b> Nº Tombo: {modalDetalhes.exemplar?.numero_tombo ?? <span className="text-gray-400">—</span>}{modalDetalhes.exemplar?.codigo_identificacao ? ` | Código de Barras: ${modalDetalhes.exemplar.codigo_identificacao}` : ""}</div>
+            <div className="mb-2"><b>Livro:</b> {modalDetalhes.livro?.titulo ?? <span className="text-gray-400">—</span>}</div>
+            <div className="mb-2"><b>Autor(es):</b> {modalDetalhes.livro?.autores && modalDetalhes.livro.autores.length > 0 ? modalDetalhes.livro.autores.map(a => a.nome).join(", ") : "Desconhecido"}</div>
+            <div className="mb-2"><b>Usuário:</b> {modalDetalhes.usuario.nome}</div>
+            <div className="mb-2"><b>Data da Reserva:</b> {modalDetalhes.data_reserva}</div>
+            <div className="mb-2"><b>Validade:</b> {modalDetalhes.data_validade_reserva ?? <span className="text-gray-400">—</span>}</div>
+            <div className="mb-2"><b>Status:</b> <span className={modalDetalhes.status === "ativa" ? "bg-green-200 text-green-800 px-2 py-1 rounded text-xs" : modalDetalhes.status === "cancelada" ? "bg-red-200 text-red-800 px-2 py-1 rounded text-xs" : modalDetalhes.status === "atendida" ? "bg-yellow-200 text-yellow-800 px-2 py-1 rounded text-xs" : "bg-gray-200 text-gray-800 px-2 py-1 rounded text-xs"}>{statusReservaLabel(modalDetalhes.status)}</span></div>
+            <div className="mb-2"><b>Localização do Exemplar:</b> {modalDetalhes.exemplar?.localizacao || <span className="text-gray-400">—</span>}</div>
+            <div className="flex justify-end mt-6">
+              <button
+                className="px-4 py-2 bg-blue-700 text-white rounded hover:bg-blue-800 font-semibold"
+                onClick={() => setModalDetalhes(null)}
+              >Fechar</button>
+            </div>
           </div>
         </div>
       )}

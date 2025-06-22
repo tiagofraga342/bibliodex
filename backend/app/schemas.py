@@ -45,9 +45,42 @@ class CategoriaReadBasic(CategoriaBase):
     id_categoria: int
     model_config = ConfigDict(from_attributes=True)
 
+# --- Exemplar Schemas ---
+class ExemplarBase(BaseModel):
+    codigo_identificacao: str = Field(comment="Código único do exemplar, ex: código de barras")
+    status: str = Field(default="disponivel", comment="Status: disponivel, emprestado, reservado, em_manutencao, perdido, descartado")
+    data_aquisicao: Optional[date] = None
+    observacoes: Optional[str] = None
+    localizacao: Optional[str] = None
+    id_livro: int
+
+class ExemplarCreate(ExemplarBase):
+    pass
+
+class ExemplarUpdate(BaseModel):
+    codigo_identificacao: Optional[str] = None
+    status: Optional[str] = None
+    data_aquisicao: Optional[date] = None
+    observacoes: Optional[str] = None
+    localizacao: Optional[str] = None
+    id_livro: Optional[int] = None
+
+class ExemplarReadBasic(ExemplarBase):
+    numero_tombo: int
+    livro: Optional["LivroReadBasic"] = None  # Garante que o livro venha populado
+    model_config = ConfigDict(from_attributes=True)
+
+class ExemplarRead(ExemplarBase):
+    numero_tombo: int
+    livro: "LivroReadBasic"
+    model_config = ConfigDict(from_attributes=True)
+
 # --- Livro Schemas ---
 class LivroBase(BaseModel):
     titulo: str
+    edicao: Optional[str] = None
+    editora: Optional[str] = None
+    isbn: Optional[str] = None
     ano_publicacao: Optional[int] = None
     status_geral: Optional[str] = Field(None, comment="Status geral do título, ex: ativo, descatalogado")
     id_categoria: int
@@ -63,6 +96,9 @@ class LivroRead(LivroBase):
     id_livro: int
     categoria: CategoriaReadBasic
     autores: List[AutorReadBasic] = []
+    exemplares: List[ExemplarReadBasic] = []
+    total_exemplares: int = 0
+    exemplares_disponiveis: int = 0
     model_config = ConfigDict(from_attributes=True)
 
 class CategoriaRead(CategoriaBase): # deu problema (internal server error), troquei para CategoriaReadBasic
@@ -112,6 +148,7 @@ class UsuarioRead(UsuarioBase): # Passo 3.2
 class UsuarioReadBasic(UsuarioBase):
     id_usuario: int
     is_active: bool
+    role: str = "usuario_cliente"  # Sempre "usuario_cliente" para usuários comuns
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -144,33 +181,6 @@ class FuncionarioUpdate(BaseModel): # Novo schema para atualização
     model_config = ConfigDict(from_attributes=True)
 
 
-# --- Exemplar Schemas ---
-class ExemplarBase(BaseModel):
-    codigo_identificacao: str = Field(comment="Código único do exemplar, ex: código de barras")
-    status: str = Field(default="disponivel", comment="Status: disponivel, emprestado, reservado, em_manutencao, perdido, descartado")
-    data_aquisicao: Optional[date] = None
-    observacoes: Optional[str] = None
-    id_livro: int
-
-class ExemplarCreate(ExemplarBase):
-    pass
-
-class ExemplarUpdate(BaseModel):
-    codigo_identificacao: Optional[str] = None
-    status: Optional[str] = None
-    data_aquisicao: Optional[date] = None
-    observacoes: Optional[str] = None
-    id_livro: Optional[int] = None
-
-class ExemplarReadBasic(ExemplarBase):
-    id_exemplar: int
-    model_config = ConfigDict(from_attributes=True)
-
-class ExemplarRead(ExemplarBase):
-    id_exemplar: int
-    livro: LivroReadBasic
-    model_config = ConfigDict(from_attributes=True)
-
 # --- Emprestimo Schemas ---
 class EmprestimoBase(BaseModel):
     data_retirada: date
@@ -178,8 +188,8 @@ class EmprestimoBase(BaseModel):
     data_efetiva_devolucao: Optional[date] = None
     status_emprestimo: str = Field(default="ativo", comment="Status: ativo, devolvido, atrasado")
     id_usuario: int
-    id_exemplar: int
-    id_funcionario_registro: int
+    numero_tombo: int
+    id_funcionario_registro: Optional[int] = None  # Agora opcional
 
 class EmprestimoCreate(EmprestimoBase):
     pass
@@ -197,10 +207,10 @@ class EmprestimoRead(EmprestimoBase):
 
 # --- Reserva Schemas ---
 class ReservaBase(BaseModel):
-    data_reserva: date
-    data_validade_reserva: date
+    data_reserva: Optional[date] = None
+    data_validade_reserva: Optional[date] = None
     status: str = Field(default="ativa", comment="Status: ativa, cancelada, expirada, atendida")
-    id_exemplar: Optional[int] = None
+    numero_tombo: Optional[int] = None
     id_livro_solicitado: Optional[int] = None
     id_usuario: int
     id_funcionario_registro: Optional[int] = None
@@ -218,13 +228,14 @@ class ReservaRead(ReservaBase):
     exemplar: Optional[ExemplarReadBasic] = None
     livro: Optional[LivroReadBasic] = None # Corresponde a id_livro_solicitado
     funcionario_registro_reserva: Optional[FuncionarioReadBasic] = None
+    data_prevista_devolucao_emprestimo: Optional[date] = None
     model_config = ConfigDict(from_attributes=True)
 
 # --- Devolucao Schemas ---
 class DevolucaoBase(BaseModel):
     data_devolucao: date
     observacoes: Optional[str] = None
-    id_funcionario_registro: int
+    id_funcionario_registro: Optional[int] = None  # Agora opcional
     id_emprestimo: int
 
 class DevolucaoCreate(DevolucaoBase):
@@ -268,4 +279,14 @@ class PenalidadeRead(PenalidadeBase):
 class PaginatedLivros(BaseModel):
     total: int
     items: List[LivroRead]
+
+class LivroUpdate(BaseModel):
+    titulo: Optional[str] = None
+    edicao: Optional[str] = None
+    editora: Optional[str] = None
+    ano_publicacao: Optional[int] = None
+    status_geral: Optional[str] = None
+    id_categoria: Optional[int] = None
+    ids_autores: Optional[List[int]] = None
+    model_config = ConfigDict(from_attributes=True)
 

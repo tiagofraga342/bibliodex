@@ -33,7 +33,7 @@ def main():
             nome = f"Funcionario Teste {i+1}"
             cargo = random.choice(CARGOS)
             matricula_funcional = f"FUNC{i+1:06d}"
-            hashed_password = "$2b$12$abcdefghijklmnopqrstuv"  # hash fake para dev
+            hashed_password = "$2b$12$qFw5eWD98fxIA4g6554xm.1/L2QEpbOBAmLFMWwPFy.HNtgNJFbNq"  # hash fake para dev (teste123)
             batch.append((nome, cargo, matricula_funcional, hashed_password))
 
         execute_values(

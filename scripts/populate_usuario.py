@@ -37,7 +37,7 @@ def main():
             telefone   = f"{random.randint(1100000000, 1199999999)}"
             matricula  = 10000000 + i
             curso_id   = random.choice(cursos)
-            hashed_password = "$2b$12$abcdefghijklmnopqrstuv"  # hash fake para dev
+            hashed_password = "$2b$12$qFw5eWD98fxIA4g6554xm.1/L2QEpbOBAmLFMWwPFy.HNtgNJFbNq"  # hash fake para dev (senha: "teste123")
             batch.append((nome, telefone, matricula, curso_id, hashed_password))
 
         execute_values(

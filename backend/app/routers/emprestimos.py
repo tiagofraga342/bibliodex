@@ -9,7 +9,7 @@ import logging
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-@router.get("/", response_model=List[schemas.EmprestimoRead])
+@router.get("", response_model=List[schemas.EmprestimoRead])
 def listar_emprestimos(
     db: Session = Depends(get_db),
     skip: int = 0,
@@ -48,18 +48,15 @@ def obter_emprestimo(
     logger.info(f"Empréstimo ID {emprestimo_id} acessado por '{getattr(current_user, 'matricula_funcional', getattr(current_user, 'matricula', ''))}'.")
     return emprestimo
 
-@router.post("/", response_model=schemas.EmprestimoRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=schemas.EmprestimoRead, status_code=status.HTTP_201_CREATED)
 def criar_emprestimo(
     emprestimo: schemas.EmprestimoCreate, 
     db: Session = Depends(get_db),
-    current_funcionario: models.Funcionario = Depends(get_current_active_funcionario) # Apenas funcionários podem criar
+    current_funcionario: models.Funcionario = Depends(get_current_active_funcionario)
 ):
-    logger.info(f"Funcionário '{current_funcionario.matricula_funcional}' tentando criar empréstimo para exemplar ID {emprestimo.id_exemplar}, usuário ID {emprestimo.id_usuario}")
-    # Garante que o id_funcionario_registro é o do funcionário logado, se não for especificado ou para sobrescrever
-    if emprestimo.id_funcionario_registro != current_funcionario.id_funcionario:
-        logger.warning(f"Funcionário '{current_funcionario.matricula_funcional}' tentou registrar empréstimo com ID de funcionário diferente ({emprestimo.id_funcionario_registro}). Usando ID do funcionário logado.")
+    logger.info(f"Funcionário '{current_funcionario.matricula_funcional}' tentando criar empréstimo para exemplar numero_tombo {emprestimo.numero_tombo}, usuário ID {emprestimo.id_usuario}")
+    # Sempre usa o funcionário autenticado, ignorando o campo enviado
     emprestimo_data_com_funcionario_correto = emprestimo.model_copy(update={"id_funcionario_registro": current_funcionario.id_funcionario})
-
     try:
         novo_emprestimo = crud.create_emprestimo(db, emprestimo_data_com_funcionario_correto)
         logger.info(f"Empréstimo ID {novo_emprestimo.id_emprestimo} criado com sucesso por '{current_funcionario.matricula_funcional}'.")

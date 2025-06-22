@@ -115,18 +115,39 @@ async def get_current_active_usuario_cliente(
     logger.debug(f"Usuário cliente ativo '{usuario.matricula}' autenticado via token.")
     return usuario
 
-# Exemplo de como você poderia ter uma dependência genérica se quisesse apenas
-# verificar se o usuário está logado, sem se importar com o papel (menos comum para controle de acesso fino):
-# async def get_any_current_active_user(
-#     token_data: Annotated[schemas.TokenData, Depends(get_current_user_data)],
-#     db: Annotated[Session, Depends(get_db)]
-# ):
-#     if token_data.role == "funcionario":
-#         return await get_current_active_funcionario(token_data, db)
-#     elif token_data.role == "usuario_cliente":
-#         return await get_current_active_usuario_cliente(token_data, db)
-#     else:
-#         raise permission_denied_exception # Papel desconhecido
+# Dependência para obter o usuário autenticado (funcionário OU cliente)
+async def get_current_user(
+    token_data: Annotated[schemas.TokenData, Depends(get_current_user_data)],
+    db: Annotated[Session, Depends(get_db)]
+) -> models.Usuario | models.Funcionario:
+    """
+    Retorna o usuário autenticado (funcionário ou cliente), validando se está ativo.
+    Lança HTTPException se não encontrado ou inativo.
+    """
+    if token_data.role == "funcionario":
+        funcionario = crud.get_funcionario_by_matricula_funcional(db, matricula_funcional=token_data.sub)
+        if funcionario is None:
+            logger.warning(f"Funcionário com matrícula '{token_data.sub}' não encontrado.")
+            raise credentials_exception
+        if not funcionario.is_active:
+            logger.warning(f"Funcionário '{funcionario.matricula_funcional}' está inativo.")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Funcionário inativo")
+        # Adiciona atributo de role para facilitar uso posterior
+        funcionario.role = "funcionario"
+        return funcionario
+    elif token_data.role == "usuario_cliente":
+        usuario = crud.get_usuario_by_matricula(db, matricula=token_data.sub)
+        if usuario is None:
+            logger.warning(f"Usuário com matrícula '{token_data.sub}' não encontrado.")
+            raise credentials_exception
+        if not usuario.is_active:
+            logger.warning(f"Usuário '{usuario.matricula}' está inativo.")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Usuário inativo")
+        usuario.role = "usuario_cliente"
+        return usuario
+    else:
+        logger.warning(f"Papel desconhecido no token: {token_data.role}")
+        raise permission_denied_exception
 
 
 # --- Endpoints de Autenticação ---

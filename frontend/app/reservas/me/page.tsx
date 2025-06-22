@@ -63,7 +63,9 @@ function MinhasReservasPage() {
             <thead className="bg-blue-100">
               <tr>
                 <th className="px-4 py-2 text-left">Livro</th>
+                <th className="px-4 py-2 text-left">Nº Tombo</th>
                 <th className="px-4 py-2 text-left">Data da Reserva</th>
+                <th className="px-4 py-2 text-left">Validade</th>
                 <th className="px-4 py-2 text-left">Status</th>
                 <th className="px-4 py-2 text-left">Ações</th>
               </tr>
@@ -72,16 +74,28 @@ function MinhasReservasPage() {
               {reservas.map(r => (
                 <tr key={r.id_reserva} className="border-t border-gray-200 hover:bg-gray-50">
                   <td className="px-4 py-2">
-                    {r.livro
-                      ? (<>{r.livro.titulo} <span className="text-xs text-gray-500">
-                          {Array.isArray((r.livro as any).autores) && (r.livro as any).autores.length > 0
-                            ? `(${(r.livro as any).autores.map((a: any) => a.nome).join(", ")})`
-                            : ""}
-                        </span></>)
-                      : <span className="text-gray-400 italic">Livro não disponível</span>
-                    }
+                    {r.livro && r.numero_tombo ? (
+                      <a
+                        href={`/livros/${r.livro.id_livro}?exemplar=${r.numero_tombo}`}
+                        className="text-blue-700 hover:underline font-semibold"
+                        title="Ver detalhes do exemplar"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {r.livro.titulo}
+                      </a>
+                    ) : r.livro ? (
+                      <span>{r.livro.titulo}</span>
+                    ) : <span className="text-gray-400 italic">Livro não disponível</span>}
+                    {r.livro && Array.isArray(r.livro.autores) && r.livro.autores.length > 0 && (
+                      <span className="block text-xs text-gray-500">
+                        {r.livro.autores.map((a: any) => a.nome).join(", ")}
+                      </span>
+                    )}
                   </td>
+                  <td className="px-4 py-2">{r.numero_tombo || <span className="text-gray-400 italic">-</span>}</td>
                   <td className="px-4 py-2">{r.data_reserva}</td>
+                  <td className="px-4 py-2">{r.data_validade_reserva || <span className="text-gray-400 italic">-</span>}</td>
                   <td className="px-4 py-2">
                     <span className={
                       r.status === "ativa"
@@ -117,7 +131,7 @@ function MinhasReservasPage() {
               ))}
               {reservas.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="text-center text-gray-500 py-8">Nenhuma reserva encontrada.</td>
+                  <td colSpan={6} className="text-center text-gray-500 py-8">Nenhuma reserva encontrada.</td>
                 </tr>
               )}
             </tbody>

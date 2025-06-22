@@ -1,8 +1,12 @@
+# OBSOLETO: O CRUD foi dividido em arquivos menores no diretório 'crud/'.
+# Utilize os módulos em backend/app/crud/ para manutenção e importação.
+
 from sqlalchemy.orm import Session, joinedload, selectinload
 from typing import List, Optional
 from fastapi import HTTPException, status # Import HTTPException
 from . import models, schemas, security # Use . para importações relativas dentro do mesmo pacote
 import logging
+import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -374,15 +378,15 @@ def delete_funcionario(db: Session, funcionario_id: int) -> Optional[models.Func
 
 
 # --- Exemplar CRUD (Existente) ---
-def get_exemplar(db: Session, exemplar_id: int) -> Optional[models.Exemplar]:
-    logger.debug(f"Buscando exemplar com id: {exemplar_id}")
+def get_exemplar(db: Session, numero_tombo: int) -> Optional[models.Exemplar]:
+    logger.debug(f"Buscando exemplar com numero_tombo: {numero_tombo}")
     exemplar = db.query(models.Exemplar).options(
         joinedload(models.Exemplar.livro).joinedload(models.Livro.categoria),
         joinedload(models.Exemplar.livro).selectinload(models.Livro.autores)
-    ).filter(models.Exemplar.id_exemplar == exemplar_id).first()
+    ).filter(models.Exemplar.numero_tombo == numero_tombo).first()
 
     if not exemplar:
-        logger.warning(f"Exemplar com id {exemplar_id} não encontrado.")
+        logger.warning(f"Exemplar com numero_tombo {numero_tombo} não encontrado.")
     return exemplar
 
 def get_exemplares_por_livro(db: Session, livro_id: int, skip: int = 0, limit: int = 100) -> List[models.Exemplar]:
@@ -405,18 +409,23 @@ def create_exemplar(db: Session, exemplar: schemas.ExemplarCreate) -> models.Exe
     if not db_livro:
         logger.error(f"Livro com id {exemplar.id_livro} não encontrado ao tentar criar exemplar {exemplar.codigo_identificacao}.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Livro com id {exemplar.id_livro} não encontrado.")
-    
+    # Impede criar exemplar disponível para livro descatalogado
+    if db_livro.status_geral == "descatalogado" and exemplar.status == "disponivel":
+        logger.warning(f"Tentativa de criar exemplar disponível para livro descatalogado (ID: {exemplar.id_livro}).")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Não é permitido criar exemplar disponível para livro descatalogado.")
+    # Se livro descatalogado, força status para 'descartado'
+    if db_livro.status_geral == "descatalogado":
+        exemplar.status = "descartado"
     # Check if codigo_identificacao is unique
     db_exemplar_check = db.query(models.Exemplar).filter(models.Exemplar.codigo_identificacao == exemplar.codigo_identificacao).first()
     if db_exemplar_check:
         logger.warning(f"Exemplar com código de identificação {exemplar.codigo_identificacao} já existe.")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Exemplar com código de identificação {exemplar.codigo_identificacao} já existe.")
-
     db_exemplar = models.Exemplar(**exemplar.model_dump())
     db.add(db_exemplar)
     db.commit()
     db.refresh(db_exemplar)
-    logger.info(f"Exemplar '{db_exemplar.codigo_identificacao}' (ID: {db_exemplar.id_exemplar}) criado com sucesso.")
+    logger.info(f"Exemplar '{db_exemplar.codigo_identificacao}' (numero_tombo: {db_exemplar.numero_tombo}) criado com sucesso.")
     return db_exemplar
 
 # --- Emprestimo CRUD (Existente) ---
@@ -441,14 +450,18 @@ def get_emprestimos(db: Session, skip: int = 0, limit: int = 100) -> List[models
     ).order_by(models.Emprestimo.data_retirada.desc()).offset(skip).limit(limit).all()
 
 def create_emprestimo(db: Session, emprestimo: schemas.EmprestimoCreate) -> models.Emprestimo:
-    logger.info(f"Tentando criar empréstimo para exemplar ID {emprestimo.id_exemplar} por usuário ID {emprestimo.id_usuario}")
-    db_exemplar = db.query(models.Exemplar).filter(models.Exemplar.id_exemplar == emprestimo.id_exemplar).first()
+    logger.info(f"Tentando criar empréstimo para exemplar numero_tombo {emprestimo.numero_tombo} por usuário ID {emprestimo.id_usuario}")
+    db_exemplar = db.query(models.Exemplar).filter(models.Exemplar.numero_tombo == emprestimo.numero_tombo).first()
     if not db_exemplar:
-        logger.error(f"Exemplar com id {emprestimo.id_exemplar} não encontrado ao criar empréstimo.")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Exemplar com id {emprestimo.id_exemplar} não encontrado.")
+        logger.error(f"Exemplar com numero_tombo {emprestimo.numero_tombo} não encontrado ao criar empréstimo.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Exemplar com numero_tombo {emprestimo.numero_tombo} não encontrado.")
+    # NOVA REGRA: Não permitir empréstimo de livro descatalogado
+    if db_exemplar.livro and db_exemplar.livro.status_geral == "descatalogado":
+        logger.warning(f"Tentativa de empréstimo de exemplar {emprestimo.numero_tombo} de livro descatalogado.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Não é permitido emprestar exemplares de livros descatalogados.")
     if db_exemplar.status != "disponivel":
-        logger.warning(f"Exemplar {emprestimo.id_exemplar} não está disponível (status: {db_exemplar.status}).")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Exemplar {emprestimo.id_exemplar} não está disponível para empréstimo.")
+        logger.warning(f"Exemplar {emprestimo.numero_tombo} não está disponível (status: {db_exemplar.status}).")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Exemplar {emprestimo.numero_tombo} não está disponível para empréstimo.")
 
     db_usuario = db.query(models.Usuario).filter(models.Usuario.id_usuario == emprestimo.id_usuario).first()
     if not db_usuario:
@@ -473,7 +486,7 @@ def create_emprestimo(db: Session, emprestimo: schemas.EmprestimoCreate) -> mode
     db.commit()
     db.refresh(db_emprestimo)
     db.refresh(db_exemplar)
-    logger.info(f"Empréstimo ID {db_emprestimo.id_emprestimo} criado com sucesso. Exemplar ID {db_exemplar.id_exemplar} status atualizado para 'emprestado'.")
+    logger.info(f"Empréstimo ID {db_emprestimo.id_emprestimo} criado com sucesso. Exemplar Nº Tombo {db_exemplar.numero_tombo} status atualizado para 'emprestado'.")
     return db_emprestimo
 
 def get_emprestimos_by_usuario_id(db: Session, usuario_id: int, skip: int = 0, limit: int = 100) -> List[models.Emprestimo]:
@@ -533,7 +546,7 @@ def get_reservas(db: Session, skip: int = 0, limit: int = 100) -> List[models.Re
     ).order_by(models.Reserva.data_reserva.desc()).offset(skip).limit(limit).all()
 
 def create_reserva(db: Session, reserva: schemas.ReservaCreate) -> models.Reserva:
-    logger.info(f"Tentando criar reserva para usuário ID {reserva.id_usuario}, exemplar ID {reserva.id_exemplar}, livro ID {reserva.id_livro_solicitado}")
+    logger.info(f"Tentando criar reserva para usuário ID {reserva.id_usuario}, numero_tombo {getattr(reserva, 'numero_tombo', None)}, livro ID {getattr(reserva, 'id_livro_solicitado', None)}")
     # Validate usuario
     db_usuario = db.query(models.Usuario).filter(models.Usuario.id_usuario == reserva.id_usuario).first()
     if not db_usuario:
@@ -553,76 +566,119 @@ def create_reserva(db: Session, reserva: schemas.ReservaCreate) -> models.Reserv
             logger.warning(f"Funcionário de registro com id {reserva.id_funcionario_registro} está inativo.")
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Funcionário de registro com id {reserva.id_funcionario_registro} está inativo.")
 
-    if reserva.id_exemplar:
-        db_exemplar = db.query(models.Exemplar).filter(models.Exemplar.id_exemplar == reserva.id_exemplar).first()
-        if not db_exemplar:
-            logger.error(f"Exemplar com id {reserva.id_exemplar} não encontrado ao criar reserva.")
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Exemplar com id {reserva.id_exemplar} não encontrado.")
-        # Regra de negócio: só pode reservar exemplar se disponível ou talvez outras condições.
-        # Por ora, vamos permitir reservar mesmo se emprestado, mas não se já reservado por outro.
-        # Esta lógica pode ser mais complexa (fila de reserva, etc.)
-        existing_active_reserva_exemplar = db.query(models.Reserva).filter(
-            models.Reserva.id_exemplar == reserva.id_exemplar,
-            models.Reserva.status == "ativa"
+    numero_tombo = reserva.numero_tombo
+    # Se numero_tombo não foi enviado, buscar exemplar disponível do livro
+    if not numero_tombo:
+        if not reserva.id_livro_solicitado:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="É obrigatório informar o numero_tombo do exemplar ou o id_livro_solicitado.")
+        # Primeiro tenta um exemplar disponível
+        db_exemplar = db.query(models.Exemplar).filter(
+            models.Exemplar.id_livro == reserva.id_livro_solicitado,
+            models.Exemplar.status == "disponivel"
         ).first()
-        if existing_active_reserva_exemplar and existing_active_reserva_exemplar.id_usuario != reserva.id_usuario:
-             logger.warning(f"Exemplar {reserva.id_exemplar} já possui uma reserva ativa por outro usuário.")
-             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Exemplar {reserva.id_exemplar} já está reservado ativamente por outro usuário.")
-        # if db_exemplar.status not in ["disponivel", "emprestado"]: # Simplificado: só pode reservar se disponível. Poderia ser mais complexo.
-        #      logger.warning(f"Exemplar {reserva.id_exemplar} não pode ser reservado (status: {db_exemplar.status}).")
-        #      raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Exemplar {reserva.id_exemplar} não pode ser reservado (status: {db_exemplar.status}).")
-    elif reserva.id_livro_solicitado:
-        db_livro = db.query(models.Livro).filter(models.Livro.id_livro == reserva.id_livro_solicitado).first()
-        if not db_livro:
-            logger.error(f"Livro com id {reserva.id_livro_solicitado} não encontrado para reserva genérica.")
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Livro com id {reserva.id_livro_solicitado} não encontrado para reserva genérica.")
+        # Se não houver disponível, tenta um emprestado
+        if not db_exemplar:
+            db_exemplar = db.query(models.Exemplar).filter(
+                models.Exemplar.id_livro == reserva.id_livro_solicitado,
+                models.Exemplar.status == "emprestado"
+            ).first()
+        if not db_exemplar:
+            logger.warning(f"Nenhum exemplar disponível ou emprestado para o livro {reserva.id_livro_solicitado}.")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Não há exemplares disponíveis ou emprestados para reserva deste livro.")
+        numero_tombo = db_exemplar.numero_tombo
     else:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="É necessário fornecer id_exemplar ou id_livro_solicitado para a reserva.")
+        db_exemplar = db.query(models.Exemplar).filter(models.Exemplar.numero_tombo == numero_tombo).first()
+        if not db_exemplar:
+            logger.error(f"Exemplar com numero_tombo {numero_tombo} não encontrado ao criar reserva.")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Exemplar com numero_tombo {numero_tombo} não encontrado.")
+        if db_exemplar.status not in ["disponivel", "emprestado"]:
+            logger.warning(f"Exemplar {numero_tombo} não está disponível nem emprestado para reserva (status: {db_exemplar.status}).")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Exemplar {numero_tombo} não está disponível nem emprestado para reserva.")
 
+    # Verifica se já existe reserva ativa para este exemplar
+    existing_active_reserva_exemplar = db.query(models.Reserva).filter(
+        models.Reserva.numero_tombo == numero_tombo,
+        models.Reserva.status == "ativa"
+    ).first()
+    if existing_active_reserva_exemplar and existing_active_reserva_exemplar.id_usuario != reserva.id_usuario:
+         logger.warning(f"Exemplar {numero_tombo} já possui uma reserva ativa por outro usuário.")
+         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Exemplar {numero_tombo} já está reservado ativamente por outro usuário.")
+    # Atualiza status do exemplar para 'reservado' ao criar reserva
+    db_exemplar.status = "reservado"
+    db.add(db_exemplar)
 
-    db_reserva = models.Reserva(**reserva.model_dump())
+    # Preencher datas se não vierem do frontend
+    hoje = datetime.date.today()
+    data_reserva = reserva.data_reserva or hoje
+    data_validade_reserva = reserva.data_validade_reserva or (hoje + datetime.timedelta(days=3))
+
+    reserva_data = reserva.model_dump()
+    reserva_data["numero_tombo"] = numero_tombo
+    reserva_data["data_reserva"] = data_reserva
+    reserva_data["data_validade_reserva"] = data_validade_reserva
+    db_reserva = models.Reserva(**reserva_data)
     db.add(db_reserva)
     db.commit()
     db.refresh(db_reserva)
-    logger.info(f"Reserva ID {db_reserva.id_reserva} criada com sucesso.")
+    logger.info(f"Reserva ID {db_reserva.id_reserva} criada com sucesso para exemplar {numero_tombo}.")
     return db_reserva
 
-def get_reservas_by_usuario_id(db: Session, usuario_id: int, skip: int = 0, limit: int = 100) -> List[models.Reserva]:
+def get_reservas_by_usuario_id(db: Session, usuario_id: int, skip: int = 0, limit: int = 100) -> list[schemas.ReservaRead]:
     logger.debug(f"Buscando reservas para o usuário ID {usuario_id}, skip: {skip}, limit: {limit}")
-    return db.query(models.Reserva).filter(models.Reserva.id_usuario == usuario_id).options(
+    reservas = db.query(models.Reserva).options(
         joinedload(models.Reserva.usuario),
-        joinedload(models.Reserva.exemplar).joinedload(models.Exemplar.livro),
+        joinedload(models.Reserva.exemplar).joinedload(models.Exemplar.livro).joinedload(models.Livro.autores),
         joinedload(models.Reserva.livro_solicitado),
         joinedload(models.Reserva.funcionario_registro_reserva)
-    ).order_by(models.Reserva.data_reserva.desc()).offset(skip).limit(limit).all()
+    ).filter(models.Reserva.id_usuario == usuario_id).order_by(models.Reserva.data_reserva.desc()).offset(skip).limit(limit).all()
+    # Preencher sempre o campo 'livro' com o livro do exemplar reservado, se houver
+    reservas_read = []
+    for r in reservas:
+        livro = None
+        if r.exemplar and r.exemplar.livro:
+            livro = r.exemplar.livro
+        elif r.livro_solicitado:
+            livro = r.livro_solicitado
+        reserva_dict = schemas.ReservaRead.model_validate(r).model_dump()
+        if livro:
+            reserva_dict["livro"] = schemas.LivroReadBasic.model_validate(livro).model_dump()
+            # Adiciona autores ao livro
+            if hasattr(livro, "autores"):
+                reserva_dict["livro"]["autores"] = [schemas.AutorReadBasic.model_validate(a).model_dump() for a in livro.autores]
+        reservas_read.append(reserva_dict)
+    return reservas_read
 
 def delete_reserva(db: Session, reserva_id: int) -> Optional[models.Reserva]:
     logger.info(f"Tentando excluir reserva com id: {reserva_id}")
     db_reserva = db.query(models.Reserva).filter(models.Reserva.id_reserva == reserva_id).first()
     if db_reserva:
+        exemplar = None
+        if db_reserva.numero_tombo:
+            exemplar = db.query(models.Exemplar).filter(models.Exemplar.numero_tombo == db_reserva.numero_tombo).first()
         if db_reserva.status == "ativa": # Ou "atendida"
             logger.warning(f"Reserva ID {reserva_id} está ativa ou atendida. Exclusão não permitida diretamente. Cancele primeiro.")
-            # Dependendo da regra, pode-se permitir deletar reservas canceladas/expiradas.
-            # Ou pode-se ter um endpoint para cancelar/expirar.
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Reserva ativa ou atendida não pode ser excluída. Cancele-a ou marque como expirada primeiro.")
-        
-        # Se a reserva foi para um exemplar específico e o status do exemplar foi alterado para 'reservado',
-        # precisaria ser revertido aqui se a reserva for deletada (e.g. se for 'cancelada' ou 'expirada').
-        # Esta lógica é complexa e depende do fluxo de status do exemplar.
-        # if db_reserva.id_exemplar and db_reserva.exemplar.status == "reservado" and db_reserva.status in ["cancelada", "expirada"]:
-        #    db_reserva.exemplar.status = "disponivel" # Ou o status anterior
-        #    db.add(db_reserva.exemplar)
-
         db.delete(db_reserva)
         db.commit()
         logger.info(f"Reserva com id {reserva_id} (status: {db_reserva.status}) excluída com sucesso.")
+        # Se o exemplar estava reservado e não há outra reserva ativa para ele, liberar
+        if exemplar and exemplar.status == "reservado":
+            reserva_ativa = db.query(models.Reserva).filter(
+                models.Reserva.numero_tombo == exemplar.numero_tombo,
+                models.Reserva.status == "ativa"
+            ).first()
+            if not reserva_ativa:
+                exemplar.status = "disponivel"
+                db.add(exemplar)
+                db.commit()
+                logger.info(f"Exemplar {exemplar.numero_tombo} liberado (status 'disponivel') após exclusão/cancelamento de reserva.")
     else:
         logger.warning(f"Reserva com id {reserva_id} não encontrada para exclusão.")
     return db_reserva
 
-# --- Devolucao CRUD (Existente) ---
-def create_devolucao(db: Session, devolucao: schemas.DevolucaoCreate) -> models.Devolucao:
-    logger.info(f"Tentando registrar devolução para empréstimo ID {devolucao.id_emprestimo}")
+# --- Devolucao CRUD (Refatorado) ---
+def _validar_emprestimo_para_devolucao(db, devolucao):
+    """Valida se o empréstimo existe e pode ser devolvido."""
     db_emprestimo = db.query(models.Emprestimo).filter(models.Emprestimo.id_emprestimo == devolucao.id_emprestimo).first()
     if not db_emprestimo:
         logger.error(f"Empréstimo com ID {devolucao.id_emprestimo} não encontrado ao registrar devolução.")
@@ -630,7 +686,10 @@ def create_devolucao(db: Session, devolucao: schemas.DevolucaoCreate) -> models.
     if db_emprestimo.data_efetiva_devolucao is not None or db_emprestimo.status_emprestimo == "devolvido":
         logger.warning(f"Empréstimo {devolucao.id_emprestimo} já foi devolvido.")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Empréstimo {devolucao.id_emprestimo} já foi devolvido.")
+    return db_emprestimo
 
+def _validar_funcionario_para_devolucao(db, devolucao):
+    """Valida se o funcionário existe e está ativo."""
     db_funcionario = db.query(models.Funcionario).filter(models.Funcionario.id_funcionario == devolucao.id_funcionario_registro).first()
     if not db_funcionario:
         logger.error(f"Funcionário de registro com id {devolucao.id_funcionario_registro} não encontrado ao registrar devolução.")
@@ -638,12 +697,18 @@ def create_devolucao(db: Session, devolucao: schemas.DevolucaoCreate) -> models.
     if not db_funcionario.is_active:
         logger.warning(f"Funcionário de registro com id {devolucao.id_funcionario_registro} está inativo.")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Funcionário de registro com id {devolucao.id_funcionario_registro} está inativo.")
+    return db_funcionario
+
+def create_devolucao(db: Session, devolucao: schemas.DevolucaoCreate) -> models.Devolucao:
+    """Registra uma devolução, atualiza status do empréstimo e exemplar."""
+    logger.info(f"Tentando registrar devolução para empréstimo ID {devolucao.id_emprestimo}")
+    db_emprestimo = _validar_emprestimo_para_devolucao(db, devolucao)
+    _validar_funcionario_para_devolucao(db, devolucao)
 
     db_devolucao = models.Devolucao(**devolucao.model_dump())
-    
     db_emprestimo.data_efetiva_devolucao = devolucao.data_devolucao
     db_emprestimo.status_emprestimo = "devolvido"
-    
+
     db_exemplar = db_emprestimo.exemplar
     if db_exemplar:
         db_exemplar.status = "disponivel"
@@ -656,7 +721,7 @@ def create_devolucao(db: Session, devolucao: schemas.DevolucaoCreate) -> models.
     db.refresh(db_emprestimo)
     if db_exemplar:
         db.refresh(db_exemplar)
-    logger.info(f"Devolução ID {db_devolucao.id_devolucao} registrada para empréstimo ID {db_emprestimo.id_emprestimo}. Exemplar ID {db_exemplar.id_exemplar if db_exemplar else 'N/A'} status atualizado.")
+    logger.info(f"Devolução ID {db_devolucao.id_devolucao} registrada para empréstimo ID {db_emprestimo.id_emprestimo}. Exemplar Nº Tombo {db_exemplar.numero_tombo if db_exemplar else 'N/A'} status atualizado.")
     return db_devolucao
 
 # --- Curso CRUD (Placeholder - Adicionar se necessário) ---
@@ -811,6 +876,15 @@ def update_exemplar(db: Session, exemplar_id: int, exemplar_update: schemas.Exem
     if not exemplar:
         logger.warning(f"Exemplar com id {exemplar_id} não encontrado para atualização.")
         return None
+    # Impede atualizar exemplar para disponível se o livro está descatalogado
+    db_livro = exemplar.livro
+    novo_status = exemplar_update.status if exemplar_update.status is not None else exemplar.status
+    if db_livro and db_livro.status_geral == "descatalogado" and novo_status == "disponivel":
+        logger.warning(f"Tentativa de atualizar exemplar para disponível em livro descatalogado (ID: {db_livro.id_livro}).")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Não é permitido deixar exemplar disponível para livro descatalogado.")
+    # Se livro descatalogado, força status para 'descartado'
+    if db_livro and db_livro.status_geral == "descatalogado":
+        exemplar_update.status = "descartado"
     for key, value in exemplar_update.model_dump(exclude_unset=True).items():
         setattr(exemplar, key, value)
     db.commit()
@@ -955,11 +1029,14 @@ def get_livros_paginados(
     titulo: str = None,
     autor: str = None,
     categoria_id: int = None,
+    isbn: str = None,
+    editora: str = None,
+    ano_publicacao: int = None,
     sort_by: str = "titulo",
     sort_dir: str = "asc"
 ):
     """
-    Retorna um dicionário com total de livros e os livros da página atual.
+    Retorna um dicionário com total de livros e os livros da página atual, incluindo contagem de exemplares.
     """
     query = db.query(models.Livro)
     if titulo:
@@ -968,11 +1045,18 @@ def get_livros_paginados(
         query = query.filter(models.Livro.id_categoria == categoria_id)
     if autor:
         query = query.join(models.Livro.autores).filter(models.Autor.nome.ilike(f"%{autor}%"))
+    if isbn:
+        query = query.filter(models.Livro.isbn == isbn)
+    if editora:
+        query = query.filter(models.Livro.editora.ilike(f"%{editora}%"))
+    if ano_publicacao:
+        query = query.filter(models.Livro.ano_publicacao == ano_publicacao)
     total = query.count()
     # Reaplica os joins para eager loading
     query = query.options(
         joinedload(models.Livro.categoria),
-        selectinload(models.Livro.autores)
+        selectinload(models.Livro.autores),
+        selectinload(models.Livro.exemplares)
     )
     sort_col = getattr(models.Livro, sort_by, models.Livro.titulo)
     if sort_dir == "desc":
@@ -981,5 +1065,37 @@ def get_livros_paginados(
         sort_col = sort_col.asc()
     query = query.order_by(sort_col)
     items = query.offset(skip).limit(limit).all()
-    return {"total": total, "items": items}
+    # Adiciona as contagens de exemplares
+    livros_result = []
+    for livro in items:
+        total_exemplares = len(livro.exemplares)
+        exemplares_disponiveis = sum(1 for ex in livro.exemplares if ex.status == "disponivel")
+        livro_dict = schemas.LivroRead.model_validate(livro).model_dump()
+        livro_dict["total_exemplares"] = total_exemplares
+        livro_dict["exemplares_disponiveis"] = exemplares_disponiveis
+        livros_result.append(livro_dict)
+    return {"total": total, "items": livros_result}
+
+def update_livro(db: Session, livro_id: int, livro_update: schemas.LivroUpdate) -> Optional[models.Livro]:
+    db_livro = db.query(models.Livro).options(selectinload(models.Livro.exemplares)).filter(models.Livro.id_livro == livro_id).first()
+    if not db_livro:
+        logger.warning(f"Livro com id {livro_id} não encontrado para atualização.")
+        return None
+    status_antes = db_livro.status_geral
+    for key, value in livro_update.model_dump(exclude_unset=True).items():
+        if key == "ids_autores" and value is not None:
+            autores = db.query(models.Autor).filter(models.Autor.id_autor.in_(value)).all()
+            db_livro.autores = autores
+        else:
+            setattr(db_livro, key, value)
+    db.commit()
+    db.refresh(db_livro)
+    # Se mudou para descatalogado, atualizar exemplares para 'descartado'
+    if status_antes != "descatalogado" and db_livro.status_geral == "descatalogado":
+        for ex in db_livro.exemplares:
+            if ex.status == "disponivel":
+                ex.status = "descartado"
+        db.commit()
+        logger.info(f"Todos exemplares disponíveis do livro ID {livro_id} foram marcados como 'descartado' por descatalogação.")
+    return db_livro
 

@@ -411,7 +411,16 @@ function EmprestimosPage() {
           <tbody>
             {filtrarEmprestimos().map(e => (
               <tr key={e.id_emprestimo} className="border-t border-gray-200 hover:bg-gray-50">
-                <td className="px-4 py-2">{e.exemplar.codigo_identificacao}</td>
+                <td className="px-4 py-2">
+                  <span
+                    className="text-blue-700 underline hover:text-blue-900 cursor-pointer"
+                    title="Ver detalhes do exemplar"
+                    style={{ textDecoration: "underline" }}
+                    onClick={() => setModalDetalhes(e)}
+                  >
+                    Nº Tombo: {e.exemplar.numero_tombo}{e.exemplar.codigo_identificacao ? ` | Código de Barras: ${e.exemplar.codigo_identificacao}` : ""}
+                  </span>
+                </td>
                 <td className="px-4 py-2">{e.usuario.nome}</td>
                 <td className="px-4 py-2">{e.data_retirada}</td>
                 <td className="px-4 py-2">{e.data_efetiva_devolucao || <span className="text-gray-400">—</span>}</td>
@@ -427,10 +436,6 @@ function EmprestimosPage() {
                   </span>
                 </td>
                 <td className="px-4 py-2 flex gap-2">
-                  <button
-                    className="px-3 py-1 bg-blue-700 text-white rounded hover:bg-blue-800 text-xs"
-                    onClick={() => setModalDetalhes(e)}
-                  >Detalhes</button>
                   {e.status_emprestimo === "ativo" && (
                     <button
                       className="px-3 py-1 bg-green-700 text-white rounded hover:bg-green-800 text-xs"
@@ -450,24 +455,28 @@ function EmprestimosPage() {
       </div>
       {/* Modal de detalhes */}
       {modalDetalhes && (
-        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
           <div className="bg-white rounded shadow-lg p-6 min-w-[320px] max-w-[90vw]">
             <h2 className="text-xl font-bold mb-2">Detalhes do Empréstimo</h2>
-            <div className="mb-2"><b>Exemplar:</b> {modalDetalhes.exemplar.codigo_identificacao}</div>
+            <div className="mb-2"><b>Exemplar:</b> Nº Tombo: {modalDetalhes.exemplar.numero_tombo}{modalDetalhes.exemplar.codigo_identificacao ? ` | Código de Barras: ${modalDetalhes.exemplar.codigo_identificacao}` : ""}</div>
             {livroDetalhe && (
               <>
                 <div className="mb-2"><b>Título do Livro:</b> {livroDetalhe.titulo}</div>
-                <div className="mb-2"><b>Autor(es):</b> {livroDetalhe.autores.join(", ")}</div>
+                <div className="mb-2"><b>Autor(es):</b> {livroDetalhe.autores.length > 0 ? livroDetalhe.autores.join(", ") : "Desconhecido"}</div>
               </>
             )}
             <div className="mb-2"><b>Usuário:</b> {modalDetalhes.usuario.nome}</div>
-            <div className="mb-2"><b>Data de Empréstimo:</b> {modalDetalhes.data_retirada}</div>
-            <div className="mb-2"><b>Data de Devolução:</b> {modalDetalhes.data_efetiva_devolucao || <span className="text-gray-400">—</span>}</div>
-            <div className="mb-2"><b>Status:</b> {modalDetalhes.status_emprestimo}</div>
-            <button
-              className="mt-4 px-4 py-2 bg-blue-700 text-white rounded hover:bg-blue-800"
-              onClick={() => setModalDetalhes(null)}
-            >Fechar</button>
+            <div className="mb-2"><b>Data de Retirada:</b> {modalDetalhes.data_retirada}</div>
+            <div className="mb-2"><b>Data Prevista de Devolução:</b> {modalDetalhes.data_prevista_devolucao}</div>
+            <div className="mb-2"><b>Data Efetiva de Devolução:</b> {modalDetalhes.data_efetiva_devolucao ?? <span className="text-gray-400">—</span>}</div>
+            <div className="mb-2"><b>Status:</b> <span className={modalDetalhes.status_emprestimo === "ativo" ? "bg-yellow-200 text-yellow-800 px-2 py-1 rounded text-xs" : modalDetalhes.status_emprestimo === "devolvido" ? "bg-green-200 text-green-800 px-2 py-1 rounded text-xs" : "bg-red-200 text-red-800 px-2 py-1 rounded text-xs"}>{statusEmprestimoLabel(modalDetalhes.status_emprestimo)}</span></div>
+            <div className="mb-2"><b>Localização do Exemplar:</b> {modalDetalhes.exemplar.localizacao || <span className="text-gray-400">—</span>}</div>
+            <div className="flex justify-end mt-6">
+              <button
+                className="px-4 py-2 bg-blue-700 text-white rounded hover:bg-blue-800 font-semibold"
+                onClick={() => setModalDetalhes(null)}
+              >Fechar</button>
+            </div>
           </div>
         </div>
       )}

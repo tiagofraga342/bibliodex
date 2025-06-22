@@ -2,8 +2,8 @@
 import * as React from 'react';
 import { useEffect, useState, useRef } from 'react';
 import { fetchUsuariosAutocomplete } from "./api";
-import api, { UsuarioReadBasic as Usuario } from './api'; // Use tipos da API
-import { useAuth } from './contexts/AuthContext'; // Import useAuth
+import api, { UsuarioReadBasic as Usuario, fetchCriarReserva } from './api';
+import { useAuth } from './contexts/AuthContext';
 import LivroForm from "./livros/components/LivroForm";
 import LivroList from "./livros/components/LivroList";
 import EmprestimoModal from "./livros/components/EmprestimoModal";
@@ -15,9 +15,14 @@ import useModalEmprestimo from "./livros/components/useModalEmprestimo";
 import useModalReserva from "./livros/components/useModalReserva";
 
 interface Filtros {
-  titulo: string;
-  autor: string;
-  categoria: string;
+  titulo?: string;
+  autor?: string;
+  categoria?: string;
+  isbn?: string;
+  editora?: string;
+  ano?: number;
+  sort_by?: string;
+  sort_dir?: string;
 }
 
 export default function Livros() {
@@ -26,7 +31,8 @@ export default function Livros() {
   const [filtros, setFiltros] = useState<Filtros>({ titulo: '', autor: '', categoria: '' });
   const [page, setPage] = useState(0);
   const [pageSize] = useState(20);
-  const { livros, total, loading, erro } = useLivros(filtros, page, pageSize);
+  const [refreshLivros, setRefreshLivros] = useState(0);
+  const { livros, total, loading, erro } = useLivros(filtros, page, pageSize, refreshLivros);
   const categorias = useCategorias();
 
   // Substitui estados/refs locais pelos hooks
@@ -55,8 +61,10 @@ export default function Livros() {
   const [dropdownLivroEmprestimoAberto, setDropdownLivroEmprestimoAberto] = useState(false);
   const dropdownLivroEmprestimoRef = useRef<HTMLDivElement>(null);
 
-  // Estado para busca manual agora usa id_categoria
-  const [buscaManual, setBuscaManual] = useState({ titulo: '', autor: '', categoria: '' });
+  // Estado para busca manual agora usa id_categoria e ordenação
+  const [buscaManual, setBuscaManual] = useState<Filtros>({ titulo: '', autor: '', categoria: '', isbn: '', editora: '', ano: undefined, sort_by: 'titulo', sort_dir: 'asc' });
+  const [inputPagina, setInputPagina] = useState("");
+  const [numeroTomboSelecionado, setNumeroTomboSelecionado] = useState<string>("");
 
   useEffect(() => {
     if (modalLivro && buscaUsuarioEmprestimo.length > 1) {
@@ -70,12 +78,18 @@ export default function Livros() {
   }, [buscaUsuarioEmprestimo, modalLivro, usuarios]);
 
   useEffect(() => {
-    if (modalReservaLivro && buscaUsuarioReserva.length > 1) {
-      const filtered = usuarios.filter(u => u.nome.toLowerCase().includes(buscaUsuarioReserva.toLowerCase()));
+    if (modalReservaLivro && buscaUsuarioReserva.length > 0) {
+      // Busca usuário por matrícula exata
+      const filtered = usuarios.filter(u => u.matricula === buscaUsuarioReserva.trim());
       setUsuariosFiltradosReserva(filtered);
-      // Or: api.get<Usuario[]>(`/api/usuarios?nome=${buscaUsuarioReserva}`).then((res) => setUsuariosFiltradosReserva(res.data));
+      if (filtered.length === 1) {
+        setUsuarioId(String(filtered[0].id_usuario));
+      } else {
+        setUsuarioId("");
+      }
     } else {
       setUsuariosFiltradosReserva([]);
+      setUsuarioId("");
     }
   }, [buscaUsuarioReserva, modalReservaLivro, usuarios]);
 
@@ -120,18 +134,18 @@ export default function Livros() {
     modalEmprestimoRef.current?.close();
   }
 
-  async function handleEmprestimo(e: React.FormEvent) {
+  async function handleEmprestimo(e: React.FormEvent, numeroTombo?: string) {
     e.preventDefault();
-    if (!modalLivro || !usuarioId) {
-      setMensagem("Livro e Usuário são obrigatórios.");
+    if (!modalLivro || !buscaUsuarioEmprestimo || !numeroTombo) {
+      setMensagem("Livro, matrícula e exemplar são obrigatórios.");
       return;
     }
     try {
-      // Buscar exemplar disponível para o livro selecionado
-      const exemplaresRes = await api.get<any[]>(`/livros/${modalLivro.id_livro}/exemplares`);
-      const exemplarDisponivel = exemplaresRes.data.find((ex: any) => ex.status === "disponivel");
-      if (!exemplarDisponivel) {
-        setMensagem("Nenhum exemplar disponível para empréstimo.");
+      // Buscar usuário pela matrícula
+      const usuariosRes = await api.get<any[]>(`/usuarios`, { matricula: buscaUsuarioEmprestimo });
+      const usuario = Array.isArray(usuariosRes.data) && usuariosRes.data.length > 0 ? usuariosRes.data[0] : null;
+      if (!usuario) {
+        setMensagem("Usuário não encontrado para a matrícula informada.");
         return;
       }
       // Calcular datas
@@ -140,14 +154,14 @@ export default function Livros() {
       const data_prevista_devolucao = new Date(hoje.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10); // 7 dias
 
       const emprestimoPayload = {
-        id_exemplar: exemplarDisponivel.id_exemplar,
-        id_usuario: parseInt(usuarioId),
+        numero_tombo: Number(numeroTombo),
+        id_usuario: usuario.id_usuario,
         data_retirada,
         data_prevista_devolucao,
-        // id_funcionario_registro: será preenchido pelo backend se funcionário autenticado
       };
       await api.post('/emprestimos', emprestimoPayload);
       setMensagem("Empréstimo realizado com sucesso!");
+      setRefreshLivros(r => r + 1);
       setTimeout(() => fecharModalEmprestimo(), 1200);
     } catch (error) {
       console.error("Erro ao realizar empréstimo:", error);
@@ -155,12 +169,25 @@ export default function Livros() {
     }
   }
 
-  function abrirModalReserva(livro: any) {
+  async function abrirModalReserva(livro: any) {
     if (!isAuthenticated) {
       alert("Você precisa estar logado para reservar livros.");
       return;
     }
-    setModalReservaLivro(livro);
+    // Buscar exemplares do livro
+    let exemplaresDisponiveis: any[] = [];
+    try {
+      const res = await api.get(`/livros/${livro.id_livro}/exemplares`);
+      exemplaresDisponiveis = Array.isArray(res.data) ? res.data : [];
+    } catch (e) {
+      exemplaresDisponiveis = [];
+    }
+    setModalReservaLivro({
+      ...livro,
+      exemplaresDisponiveis,
+      numeroTomboSelecionado: "",
+      setNumeroTomboSelecionado: setNumeroTomboSelecionado
+    });
     setUsuarioId(authUser?.role === 'usuario_cliente' ? String(authUser.user_id) : ""); // Pre-fill for cliente
     setBuscaUsuarioReserva(authUser?.role === 'usuario_cliente' ? authUser.nome || "" : "");
     setMensagemReserva("");
@@ -175,30 +202,40 @@ export default function Livros() {
     modalReservaRef.current?.close();
   }
 
-  async function handleReserva(e: React.FormEvent) {
+  async function handleReserva(e: React.FormEvent, numeroTomboSelecionado?: string) {
     e.preventDefault();
     if (!modalReservaLivro || !usuarioId) {
       setMensagemReserva("Livro e Usuário são obrigatórios.");
       return;
     }
+    // Validação extra: funcionário só pode reservar se matrícula digitada corresponder a um usuário existente
+    if (authUser?.role === 'funcionario') {
+      if (!buscaUsuarioReserva.trim()) {
+        setMensagemReserva("Digite a matrícula do usuário.");
+        return;
+      }
+      const usuarioSelecionado = usuariosFiltradosReserva.find(u => String(u.id_usuario) === usuarioId && u.matricula === buscaUsuarioReserva.trim());
+      if (!usuarioSelecionado) {
+        setMensagemReserva("Matrícula não encontrada.");
+        return;
+      }
+    }
     try {
-      // Calcule as datas conforme a regra de negócio (exemplo: validade = hoje + 3 dias)
-      const hoje = new Date();
-      const data_reserva = hoje.toISOString().slice(0, 10);
-      const data_validade_reserva = new Date(hoje.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-
-      const reservaPayload = {
-        id_livro_solicitado: modalReservaLivro.id_livro,
-        id_usuario: parseInt(usuarioId),
-        data_reserva,
-        data_validade_reserva,
-      };
-      await api.post('/reservas', reservaPayload);
+      const payload: any = { id_livro: modalReservaLivro.id_livro, id_usuario: parseInt(usuarioId) };
+      if (numeroTomboSelecionado) payload.numero_tombo = Number(numeroTomboSelecionado);
+      await fetchCriarReserva(payload);
       setMensagemReserva("Reserva realizada com sucesso!");
+      setRefreshLivros(r => r + 1); // Atualiza lista de livros
       setTimeout(() => fecharModalReserva(), 1200);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao realizar reserva:", error);
-      setMensagemReserva("Falha ao realizar reserva.");
+      if (error?.data?.detail) {
+        setMensagemReserva(error.data.detail);
+      } else if (error?.message) {
+        setMensagemReserva(error.message);
+      } else {
+        setMensagemReserva("Falha ao realizar reserva.");
+      }
     }
   }
 
@@ -234,9 +271,47 @@ export default function Livros() {
     setFiltros({
       titulo: buscaManual.titulo,
       autor: buscaManual.autor,
-      categoria: buscaManual.categoria // agora é id_categoria
+      categoria: buscaManual.categoria,
+      isbn: buscaManual.isbn,
+      editora: buscaManual.editora,
+      ano: buscaManual.ano,
+      sort_by: buscaManual.sort_by,
+      sort_dir: buscaManual.sort_dir,
     });
     setPage(0); // Sempre volta para a primeira página ao buscar
+  }
+
+  // Função para ir para página digitada
+  function irParaPagina(e: React.FormEvent) {
+    e.preventDefault();
+    const num = Number(inputPagina);
+    if (!isNaN(num) && num >= 1 && num <= totalPaginas) {
+      setPage(num - 1);
+    }
+    setInputPagina("");
+  }
+
+  // Função para gerar páginas resumidas com saltos grandes e metadados
+  function paginasResumidas() {
+    const paginas = [];
+    const saltos = [10000, 1000, 100, 10];
+    paginas.push({p: 0, salto: null}); // primeira
+    // Saltos para trás
+    saltos.forEach(s => {
+      if (page - s > 0) paginas.push({p: page - s, salto: -s});
+    });
+    // Página atual
+    if (page !== 0 && page !== totalPaginas - 1) paginas.push({p: page, salto: null});
+    // Saltos para frente
+    saltos.slice().reverse().forEach(s => {
+      if (page + s < totalPaginas - 1) paginas.push({p: page + s, salto: +s});
+    });
+    // Última página
+    if (totalPaginas > 1) paginas.push({p: totalPaginas - 1, salto: null});
+    // Remover duplicados e ordenar
+    const unique = new Map();
+    for (const obj of paginas) unique.set(obj.p, obj);
+    return Array.from(unique.values()).sort((a, b) => a.p - b.p);
   }
 
   const totalPaginas = Math.max(1, Math.ceil(total / pageSize));
@@ -246,7 +321,16 @@ export default function Livros() {
       <h1 className="text-2xl font-bold mb-4 text-gray-900">Consulta de Livros</h1>
       <div className="flex flex-col gap-2 mb-6">
         <LivroForm
-          valores={buscaManual}
+          valores={{
+            titulo: buscaManual.titulo ?? "",
+            autor: buscaManual.autor ?? "",
+            categoria: buscaManual.categoria ?? "",
+            isbn: buscaManual.isbn,
+            editora: buscaManual.editora,
+            ano: buscaManual.ano,
+            sort_by: buscaManual.sort_by,
+            sort_dir: buscaManual.sort_dir,
+          }}
           categorias={categorias}
           onChange={setBuscaManual}
           onSubmit={aplicarBusca}
@@ -259,7 +343,7 @@ export default function Livros() {
           livros={livros}
           isAuthenticated={isAuthenticated}
           abrirModalEmprestimo={abrirModalEmprestimo}
-          abrirModalReserva={abrirModalReserva}
+          abrirModalReserva={abrirModalReserva} // nova prop
         />
       )}
       <EmprestimoModal
@@ -278,6 +362,8 @@ export default function Livros() {
         dropdownUsuarioEmprestimoAberto={dropdownUsuarioEmprestimoAberto}
         setDropdownUsuarioEmprestimoAberto={setDropdownUsuarioEmprestimoAberto}
         dropdownUsuarioEmprestimoRef={dropdownUsuarioEmprestimoRef}
+        numeroTomboSelecionado={numeroTomboSelecionado}
+        setNumeroTomboSelecionado={setNumeroTomboSelecionado}
       />
       <ReservaModal
         modalReservaLivro={modalReservaLivro}
@@ -289,6 +375,7 @@ export default function Livros() {
         usuariosFiltradosReserva={usuariosFiltradosReserva}
         setUsuariosFiltradosReserva={setUsuariosFiltradosReserva}
         mensagemReserva={mensagemReserva}
+        setMensagemReserva={setMensagemReserva}
         handleReserva={handleReserva}
         fecharModalReserva={fecharModalReserva}
         modalReservaRef={modalReservaRef}
@@ -296,25 +383,64 @@ export default function Livros() {
         setDropdownUsuarioReservaAberto={setDropdownUsuarioReservaAberto}
         dropdownUsuarioReservaRef={dropdownUsuarioReservaRef}
       />
-      {/* Controles de paginação */}
-      <div className="flex justify-between items-center mt-4">
-        <button
-          onClick={() => setPage(page - 1)}
-          disabled={page === 0}
-          className="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 disabled:opacity-50"
-        >
-          Anterior
-        </button>
-        <span className="text-gray-700">
-          Página {page + 1} de {totalPaginas}
-        </span>
-        <button
-          onClick={() => setPage(page + 1)}
-          disabled={page + 1 >= totalPaginas}
-          className="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 disabled:opacity-50"
-        >
-          Próxima
-        </button>
+      {/* Controles de paginação avançados */}
+      <div className="flex flex-col items-center gap-2 mt-4 pt-4">
+        <div className="w-full overflow-x-auto" style={{paddingTop: '1.5rem'}}>
+          <div className="flex gap-1 items-center whitespace-nowrap justify-center">
+            <button
+              onClick={() => setPage(page - 1)}
+              disabled={page === 0}
+              className="px-2 py-1 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 disabled:opacity-50"
+            >
+              Anterior
+            </button>
+            {paginasResumidas().map((obj, idx) =>
+              obj.p === page ? (
+                <button
+                  key={obj.p}
+                  className="px-2 py-1 rounded bg-blue-500 text-white border border-blue-700"
+                  disabled
+                >
+                  {obj.p + 1}
+                </button>
+              ) : (
+                <button
+                  key={obj.p}
+                  onClick={() => setPage(obj.p)}
+                  className={`px-2 py-1 rounded bg-gray-200 text-gray-800 hover:bg-gray-300 border ${obj.salto ? 'border-yellow-500 relative overflow-visible' : 'border-gray-300'}`}
+                >
+                  {obj.p + 1}
+                  {obj.salto && (
+                    <span className="absolute -top-3 -right-3 z-10 text-xs bg-yellow-200 text-yellow-800 px-1 rounded border border-yellow-400" title={`Salto de ${obj.salto > 0 ? '+' : ''}${obj.salto}`}>
+                      {obj.salto > 0 ? '+' : ''}{obj.salto}
+                    </span>
+                  )}
+                </button>
+              )
+            )}
+            <button
+              onClick={() => setPage(page + 1)}
+              disabled={page + 1 >= totalPaginas}
+              className="px-2 py-1 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 disabled:opacity-50"
+            >
+              Próxima
+            </button>
+          </div>
+        </div>
+        <form onSubmit={irParaPagina} className="flex items-center gap-2 mt-1">
+          <label htmlFor="inputPagina" className="text-gray-700 text-sm">Ir para página:</label>
+          <input
+            id="inputPagina"
+            type="number"
+            min={1}
+            max={totalPaginas}
+            value={inputPagina}
+            onChange={e => setInputPagina(e.target.value)}
+            className="w-20 px-2 py-1 border rounded"
+            placeholder="Nº"
+          />
+          <button type="submit" className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm">Ir</button>
+        </form>
       </div>
     </div>
   );

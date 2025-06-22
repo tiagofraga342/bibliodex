@@ -1,13 +1,20 @@
+"use client";
+
 import { useEffect, useState } from "react";
 import { fetchLivros, PaginatedLivros } from "../../api";
 
 export interface Filtros {
-  titulo: string;
-  autor: string;
-  categoria: string;
+  titulo?: string;
+  autor?: string;
+  categoria?: string;
+  isbn?: string;
+  editora?: string;
+  ano?: number;
+  sort_by?: string;
+  sort_dir?: string;
 }
 
-export default function useLivros(filtros: Filtros, page: number, pageSize: number) {
+export default function useLivros(filtros: Filtros, page: number, pageSize: number, refresh: number = 0) {
   const [livros, setLivros] = useState<any[]>([]);
   const [total, setTotal] = useState<number>(0);
   const [loading, setLoading] = useState(true);
@@ -21,8 +28,11 @@ export default function useLivros(filtros: Filtros, page: number, pageSize: numb
       titulo: filtros.titulo || undefined,
       autor: filtros.autor || undefined,
       categoria_id: filtros.categoria ? Number(filtros.categoria) : undefined,
-      sort_by: "titulo",
-      sort_dir: "asc",
+      isbn: filtros.isbn || undefined,
+      editora: filtros.editora || undefined,
+      ano_publicacao: filtros.ano ? Number(filtros.ano) : undefined,
+      sort_by: filtros.sort_by || "titulo",
+      sort_dir: filtros.sort_dir || "asc",
     })
       .then((res) => {
         setLivros(res.data.items);
@@ -38,7 +48,7 @@ export default function useLivros(filtros: Filtros, page: number, pageSize: numb
         setErro(msg);
         setLoading(false);
       });
-  }, [filtros, page, pageSize]);
+  }, [filtros, page, pageSize, refresh]);
 
   return { livros, total, loading, erro };
 }

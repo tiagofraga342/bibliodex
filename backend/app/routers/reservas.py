@@ -5,12 +5,12 @@ from typing import List # Add this import
 
 from app.database import get_db
 from app import crud, schemas, models
-from app.routers.auth import get_current_active_funcionario, get_current_active_usuario_cliente
+from app.routers.auth import get_current_active_funcionario, get_current_active_usuario_cliente, get_current_user
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-@router.get("/", response_model=List[schemas.ReservaRead]) # Updated response_model
+@router.get("", response_model=List[schemas.ReservaRead]) # Updated response_model
 def listar_reservas(
     db: Session = Depends(get_db), 
     skip: int = 0, 
@@ -61,38 +61,27 @@ def obter_reserva(
     logger.debug(f"Reserva ID {reserva_id} encontrada.")
     return reserva
 
-@router.post("/", response_model=schemas.ReservaRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=schemas.ReservaRead, status_code=status.HTTP_201_CREATED)
 def criar_reserva(
     reserva: schemas.ReservaCreate,
     db: Session = Depends(get_db),
-    current_user: models.Usuario = Depends(get_current_active_usuario_cliente) # Usuários podem criar para si
-                                        # Funcionários podem criar para outros (requer lógica adicional)
+    current_user: models.Usuario | models.Funcionario = Depends(get_current_user) # Permite cliente OU funcionário
 ):
-    # Se um funcionário está criando, ele pode especificar o id_usuario.
-    # Se um usuário cliente está criando, o id_usuario deve ser o dele.
-    # O id_funcionario_registro é para o funcionário que processou, se aplicável.
-
-    user_making_request_id = current_user.id_usuario
-    user_making_request_role = "usuario_cliente"
-    if hasattr(current_user, 'matricula_funcional'): # é um funcionário
-        user_making_request_role = "funcionario"
-        # Funcionário pode estar criando para outro usuário, ou para si mesmo (menos comum)
-        # Se reserva.id_usuario não for o current_user.id_usuario, então é para outro.
-        # O id_funcionario_registro deve ser o funcionário logado.
-        if reserva.id_funcionario_registro != current_user.id_funcionario:
-             logger.warning(f"Funcionário '{current_user.matricula_funcional}' tentou registrar reserva com ID de funcionário diferente ({reserva.id_funcionario_registro}). Usando ID do funcionário logado.")
-        reserva_data = reserva.model_copy(update={"id_funcionario_registro": current_user.id_funcionario})
-        logger.info(f"Funcionário '{current_user.matricula_funcional}' tentando criar reserva para usuário ID {reserva_data.id_usuario}.")
-
-    elif reserva.id_usuario != user_making_request_id:
-        logger.error(f"Usuário cliente '{current_user.matricula}' tentou criar reserva para outro usuário ID {reserva.id_usuario}.")
+    # Se funcionário, pode criar para qualquer usuário; se cliente, só para si
+    user_making_request_id = getattr(current_user, 'id_usuario', None)
+    user_making_request_role = getattr(current_user, 'role', None) or (
+        'funcionario' if hasattr(current_user, 'matricula_funcional') else 'usuario_cliente'
+    )
+    if user_making_request_role == "usuario_cliente" and reserva.id_usuario != user_making_request_id:
+        logger.error(f"Usuário cliente '{getattr(current_user, 'matricula', None)}' tentou criar reserva para outro usuário ID {reserva.id_usuario}.")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Não autorizado a criar reserva para outro usuário.")
-    else: # Usuário cliente criando para si mesmo
-        # id_funcionario_registro pode ser None ou definido se um funcionário auxiliar no processo (via interface admin)
-        reserva_data = reserva.model_copy() # Garante que id_usuario é o do current_user
-        logger.info(f"Usuário '{current_user.matricula}' tentando criar reserva para si mesmo.")
-
-
+    if user_making_request_role == "funcionario":
+        # Garante que o id_funcionario_registro seja do funcionário logado
+        reserva_data = reserva.model_copy(update={"id_funcionario_registro": getattr(current_user, 'id_funcionario', None)})
+        logger.info(f"Funcionário '{getattr(current_user, 'matricula_funcional', None)}' criando reserva para usuário ID {reserva_data.id_usuario}.")
+    else:
+        reserva_data = reserva.model_copy()
+        logger.info(f"Usuário '{getattr(current_user, 'matricula', None)}' criando reserva para si mesmo.")
     try:
         nova_reserva = crud.create_reserva(db, reserva_data)
         logger.info(f"Reserva ID {nova_reserva.id_reserva} criada com sucesso (solicitante: {user_making_request_role} ID {user_making_request_id}).")
@@ -143,7 +132,21 @@ def cancelar_reserva_usuario(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Só é possível cancelar reservas ativas")
     reserva.status = "cancelada"
     db.add(reserva)
-    db.commit()
+    db.commit()  # Commita imediatamente para garantir que a reserva não é mais "ativa"
+    # Libera exemplar se não houver outra reserva ativa para ele
+    if reserva.numero_tombo:
+        exemplar = db.query(models.Exemplar).filter(models.Exemplar.numero_tombo == reserva.numero_tombo).first()
+        if exemplar and exemplar.status == "reservado":
+            reserva_ativa = db.query(models.Reserva).filter(
+                models.Reserva.numero_tombo == exemplar.numero_tombo,
+                models.Reserva.status == "ativa"
+            ).first()
+            if not reserva_ativa:
+                exemplar.status = "disponivel"
+                db.add(exemplar)
+                db.commit()
+                db.refresh(exemplar)
+                logger.info(f"Status do exemplar {exemplar.numero_tombo} após cancelamento: {exemplar.status}")
     db.refresh(reserva)
     logger.info(f"Reserva ID {reserva_id} cancelada pelo usuário '{current_user.matricula}'.")
     return reserva

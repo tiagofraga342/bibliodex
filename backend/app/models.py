@@ -16,6 +16,9 @@ class Livro(Base):
     __tablename__ = "livro"
     id_livro: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     titulo: Mapped[str] = mapped_column(String)
+    edicao: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    editora: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    isbn: Mapped[Optional[str]] = mapped_column(String, unique=True, nullable=True)
     ano_publicacao: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     status_geral: Mapped[Optional[str]] = mapped_column(String, nullable=True, comment="Status geral do título, ex: ativo, descatalogado")
     id_categoria: Mapped[int] = mapped_column(Integer, ForeignKey("categoria.id_categoria"))
@@ -79,15 +82,16 @@ class Funcionario(Base):
 
 class Exemplar(Base):
     __tablename__ = "exemplar"
-    id_exemplar: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    numero_tombo: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     codigo_identificacao: Mapped[str] = mapped_column(String, unique=True, index=True, comment="Código único do exemplar, ex: código de barras")
     status: Mapped[str] = mapped_column(String, default="disponivel", comment="Status: disponivel, emprestado, reservado, em_manutencao, perdido, descartado")
     data_aquisicao: Mapped[Optional[PyDate]] = mapped_column(Date, nullable=True)
     observacoes: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    localizacao: Mapped[Optional[str]] = mapped_column(String, nullable=True, comment="Localização física do exemplar na biblioteca.")
     id_livro: Mapped[int] = mapped_column(Integer, ForeignKey("livro.id_livro"))
     livro: Mapped["Livro"] = relationship("Livro", back_populates="exemplares")
     emprestimos: Mapped[PyList["Emprestimo"]] = relationship("Emprestimo", back_populates="exemplar")
-    reservas: Mapped[PyList["Reserva"]] = relationship("Reserva", foreign_keys="[Reserva.id_exemplar]", back_populates="exemplar")
+    reservas: Mapped[PyList["Reserva"]] = relationship("Reserva", foreign_keys="[Reserva.numero_tombo]", back_populates="exemplar")
 
 class Emprestimo(Base):
     __tablename__ = "emprestimo"
@@ -97,7 +101,7 @@ class Emprestimo(Base):
     data_efetiva_devolucao: Mapped[Optional[PyDate]] = mapped_column(Date, nullable=True)
     status_emprestimo: Mapped[str] = mapped_column(String, default="ativo", comment="Status: ativo, devolvido, atrasado")
     id_usuario: Mapped[int] = mapped_column(Integer, ForeignKey("usuario.id_usuario"))
-    id_exemplar: Mapped[int] = mapped_column(Integer, ForeignKey("exemplar.id_exemplar"))
+    numero_tombo: Mapped[int] = mapped_column(Integer, ForeignKey("exemplar.numero_tombo"))
     id_funcionario_registro: Mapped[int] = mapped_column(Integer, ForeignKey("funcionario.id_funcionario"))
     usuario: Mapped["Usuario"] = relationship("Usuario", back_populates="emprestimos")
     exemplar: Mapped["Exemplar"] = relationship("Exemplar", back_populates="emprestimos")
@@ -111,12 +115,12 @@ class Reserva(Base):
     data_reserva: Mapped[PyDate] = mapped_column(Date, nullable=False)
     data_validade_reserva: Mapped[PyDate] = mapped_column(Date, nullable=False)
     status: Mapped[str] = mapped_column(String, default="ativa", comment="Status: ativa, cancelada, expirada, atendida")
-    id_exemplar: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("exemplar.id_exemplar"), nullable=True)
+    numero_tombo: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("exemplar.numero_tombo"), nullable=True)
     id_livro_solicitado: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("livro.id_livro"), nullable=True, comment="Para reservas genéricas de um título")
     id_usuario: Mapped[int] = mapped_column(Integer, ForeignKey("usuario.id_usuario"))
     id_funcionario_registro: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("funcionario.id_funcionario"), nullable=True)
     usuario: Mapped["Usuario"] = relationship("Usuario", back_populates="reservas")
-    exemplar: Mapped[Optional["Exemplar"]] = relationship("Exemplar", foreign_keys=[id_exemplar], back_populates="reservas")
+    exemplar: Mapped[Optional["Exemplar"]] = relationship("Exemplar", foreign_keys=[numero_tombo], back_populates="reservas")
     livro_solicitado: Mapped[Optional["Livro"]] = relationship("Livro", foreign_keys=[id_livro_solicitado], back_populates="reservas_solicitadas")
     funcionario_registro_reserva: Mapped[Optional["Funcionario"]] = relationship("Funcionario", foreign_keys=[id_funcionario_registro], back_populates="reservas_registradas")
 

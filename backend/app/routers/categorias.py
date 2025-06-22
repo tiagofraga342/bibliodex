@@ -4,7 +4,8 @@ from sqlalchemy.orm import Session # Import Session
 import logging # Import logging
 
 from app.database import get_db
-from app import crud, schemas, models # Import models
+from app import crud
+from app import schemas, models # Import models
 from app.routers.auth import get_current_active_funcionario # Import auth dependency
 
 router = APIRouter()

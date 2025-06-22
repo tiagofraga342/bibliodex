@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List
 from sqlalchemy.orm import Session
 from app.database import get_db
-import app.crud as crud
+from app.crud import *
 import app.schemas as schemas
 import app.models as models
 from app.routers.auth import get_current_active_funcionario, get_current_active_usuario_cliente # Adicionado get_current_active_usuario_cliente
@@ -12,18 +12,22 @@ import logging # Import logging
 router = APIRouter()
 logger = logging.getLogger(__name__) # Logger para este módulo
 
-@router.get("/", response_model=List[schemas.UsuarioRead])
+@router.get("", response_model=List[schemas.UsuarioRead])
 def listar_usuarios(
     db: Session = Depends(get_db), 
     current_funcionario: models.Funcionario = Depends(get_current_active_funcionario),
     skip: int = 0, # Adicionado skip
     limit: int = 100, # Adicionado limit
     nome_like: str = Query(None, description="Busca por nome (autocomplete)"),
+    matricula: str = Query(None, description="Busca exata por matrícula"),
     sort_by: str = "nome",
     sort_dir: str = "asc"
 ):
-    logger.info(f"Funcionário '{current_funcionario.matricula_funcional}' listando usuários com skip={skip}, limit={limit}")
-    usuarios = crud.get_usuarios(
+    logger.info(f"Funcionário '{current_funcionario.matricula_funcional}' listando usuários com skip={skip}, limit={limit}, matricula={matricula}")
+    if matricula:
+        usuario = get_usuario_by_matricula(db, matricula=matricula)
+        return [usuario] if usuario else []
+    usuarios = get_usuarios(
         db,
         skip=skip,
         limit=limit,
@@ -46,7 +50,7 @@ def obter_usuario(
     current_funcionario: models.Funcionario = Depends(get_current_active_funcionario)
 ):
     logger.info(f"Funcionário '{current_funcionario.matricula_funcional}' buscando usuário ID: {usuario_id}")
-    usuario = crud.get_usuario(db, usuario_id)
+    usuario = get_usuario(db, usuario_id)
     if not usuario:
         logger.warning(f"Usuário com ID {usuario_id} não encontrado.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
@@ -62,7 +66,7 @@ def criar_usuario(
     logger.info(f"Funcionário '{current_funcionario.matricula_funcional}' tentando criar usuário: {usuario.matricula}")
     try:
         # A verificação de matrícula duplicada e de curso_id é feita no crud.create_usuario
-        novo_usuario = crud.create_usuario(db=db, usuario=usuario)
+        novo_usuario = create_usuario(db=db, usuario=usuario)
         logger.info(f"Usuário '{novo_usuario.matricula}' (ID: {novo_usuario.id_usuario}) criado com sucesso por '{current_funcionario.matricula_funcional}'.")
         return novo_usuario
     except HTTPException as e:
@@ -81,9 +85,9 @@ def excluir_usuario(
 ):
     logger.info(f"Funcionário '{current_funcionario.matricula_funcional}' tentando excluir usuário ID: {usuario_id}")
     # crud.delete_usuario agora lida com as verificações e levanta HTTPExceptions
-    deleted_usuario = crud.delete_usuario(db, usuario_id)
+    deleted_usuario = delete_usuario(db, usuario_id)
     
-    if deleted_usuario is None and not crud.get_usuario(db, usuario_id): # Checa se realmente não existe mais
+    if deleted_usuario is None and not get_usuario(db, usuario_id): # Checa se realmente não existe mais
          logger.warning(f"Usuário ID {usuario_id} não encontrado para exclusão por '{current_funcionario.matricula_funcional}'.")
          raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
 

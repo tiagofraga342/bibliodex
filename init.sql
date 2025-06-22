@@ -11,6 +11,9 @@ COMMENT ON TABLE categoria IS 'Tabela para armazenar as categorias dos livros.';
 CREATE TABLE IF NOT EXISTS livro (
     id_livro SERIAL PRIMARY KEY,
     titulo VARCHAR NOT NULL,
+    edicao VARCHAR,
+    editora VARCHAR,
+    isbn VARCHAR UNIQUE,
     ano_publicacao INTEGER,
     status_geral VARCHAR, -- Status geral do título, ex: ativo, descatalogado
     id_categoria INTEGER NOT NULL,
@@ -22,6 +25,9 @@ CREATE TABLE IF NOT EXISTS livro (
 CREATE INDEX IF NOT EXISTS idx_livro_id_livro ON livro(id_livro);
 COMMENT ON TABLE livro IS 'Tabela para armazenar informações sobre os livros.';
 COMMENT ON COLUMN livro.status_geral IS 'Status geral do título, ex: ativo, descatalogado';
+COMMENT ON COLUMN livro.edicao IS 'Edição do livro, ex: 1ª, 2ª, revisada';
+COMMENT ON COLUMN livro.editora IS 'Editora do livro';
+COMMENT ON COLUMN livro.isbn IS 'ISBN do livro';
 
 -- Tabela: autor
 CREATE TABLE IF NOT EXISTS autor (
@@ -88,11 +94,12 @@ COMMENT ON TABLE funcionario IS 'Tabela para armazenar informações dos funcion
 
 -- Tabela: exemplar
 CREATE TABLE IF NOT EXISTS exemplar (
-    id_exemplar SERIAL PRIMARY KEY,
+    numero_tombo SERIAL PRIMARY KEY,
     codigo_identificacao VARCHAR UNIQUE NOT NULL, -- Código único do exemplar, ex: código de barras
     status VARCHAR DEFAULT 'disponivel' NOT NULL, -- Status: disponivel, emprestado, reservado, em_manutencao, perdido, descartado
     data_aquisicao DATE,
     observacoes TEXT,
+    localizacao VARCHAR, -- Localização física do exemplar
     id_livro INTEGER NOT NULL,
     CONSTRAINT fk_exemplar_livro
         FOREIGN KEY(id_livro)
@@ -103,6 +110,7 @@ CREATE INDEX IF NOT EXISTS idx_exemplar_codigo_identificacao ON exemplar(codigo_
 COMMENT ON TABLE exemplar IS 'Tabela para armazenar os exemplares físicos dos livros.';
 COMMENT ON COLUMN exemplar.codigo_identificacao IS 'Código único do exemplar, ex: código de barras';
 COMMENT ON COLUMN exemplar.status IS 'Status: disponivel, emprestado, reservado, em_manutencao, perdido, descartado';
+COMMENT ON COLUMN exemplar.localizacao IS 'Localização física do exemplar na biblioteca.';
 
 -- Tabela: emprestimo
 CREATE TABLE IF NOT EXISTS emprestimo (
@@ -112,15 +120,15 @@ CREATE TABLE IF NOT EXISTS emprestimo (
     data_efetiva_devolucao DATE,
     status_emprestimo VARCHAR DEFAULT 'ativo' NOT NULL, -- Status: ativo, devolvido, atrasado
     id_usuario INTEGER NOT NULL,
-    id_exemplar INTEGER NOT NULL,
+    numero_tombo INTEGER NOT NULL,
     id_funcionario_registro INTEGER NOT NULL,
     CONSTRAINT fk_emprestimo_usuario
         FOREIGN KEY(id_usuario)
         REFERENCES usuario(id_usuario)
         ON DELETE RESTRICT,
     CONSTRAINT fk_emprestimo_exemplar
-        FOREIGN KEY(id_exemplar)
-        REFERENCES exemplar(id_exemplar)
+        FOREIGN KEY(numero_tombo)
+        REFERENCES exemplar(numero_tombo)
         ON DELETE RESTRICT,
     CONSTRAINT fk_emprestimo_funcionario
         FOREIGN KEY(id_funcionario_registro)
@@ -136,7 +144,7 @@ CREATE TABLE IF NOT EXISTS reserva (
     data_reserva DATE NOT NULL,
     data_validade_reserva DATE NOT NULL,
     status VARCHAR DEFAULT 'ativa' NOT NULL, -- Status: ativa, cancelada, expirada, atendida
-    id_exemplar INTEGER, -- Pode ser nulo se for reserva de título
+    numero_tombo INTEGER, -- Pode ser nulo se for reserva de título
     id_livro_solicitado INTEGER, -- Para reservas genéricas de um título
     id_usuario INTEGER NOT NULL,
     id_funcionario_registro INTEGER, -- Funcionário que auxiliou no registro
@@ -145,8 +153,8 @@ CREATE TABLE IF NOT EXISTS reserva (
         REFERENCES usuario(id_usuario)
         ON DELETE CASCADE, -- Se usuário for deletado, suas reservas são canceladas/deletadas
     CONSTRAINT fk_reserva_exemplar
-        FOREIGN KEY(id_exemplar)
-        REFERENCES exemplar(id_exemplar)
+        FOREIGN KEY(numero_tombo)
+        REFERENCES exemplar(numero_tombo)
         ON DELETE SET NULL, -- Se exemplar for deletado, a reserva pode ficar sem exemplar específico
     CONSTRAINT fk_reserva_livro_solicitado
         FOREIGN KEY(id_livro_solicitado)
@@ -156,7 +164,7 @@ CREATE TABLE IF NOT EXISTS reserva (
         FOREIGN KEY(id_funcionario_registro)
         REFERENCES funcionario(id_funcionario)
         ON DELETE SET NULL,
-    CONSTRAINT chk_reserva_item CHECK (id_exemplar IS NOT NULL OR id_livro_solicitado IS NOT NULL) -- Garante que ou exemplar ou livro é referenciado
+    CONSTRAINT chk_reserva_item CHECK (numero_tombo IS NOT NULL OR id_livro_solicitado IS NOT NULL) -- Garante que ou exemplar ou livro é referenciado
 );
 COMMENT ON TABLE reserva IS 'Tabela para registrar as reservas de livros/exemplares.';
 COMMENT ON COLUMN reserva.status IS 'Status: ativa, cancelada, expirada, atendida';

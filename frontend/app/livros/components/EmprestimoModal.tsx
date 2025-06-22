@@ -1,4 +1,7 @@
-import React from "react";
+"use client";
+
+import React, { useEffect, useState } from "react";
+import api from "../../api";
 
 interface EmprestimoModalProps {
   modalLivro: any;
@@ -10,12 +13,14 @@ interface EmprestimoModalProps {
   usuariosFiltradosEmprestimo: any[];
   setUsuariosFiltradosEmprestimo: (v: any[]) => void;
   mensagem: string;
-  handleEmprestimo: (e: React.FormEvent) => void;
+  handleEmprestimo: (e: React.FormEvent, numeroTombo?: string) => void;
   fecharModalEmprestimo: () => void;
   modalEmprestimoRef: React.RefObject<HTMLDialogElement>;
   dropdownUsuarioEmprestimoAberto: boolean;
   setDropdownUsuarioEmprestimoAberto: (v: boolean) => void;
   dropdownUsuarioEmprestimoRef: React.RefObject<HTMLDivElement>;
+  numeroTomboSelecionado: string;
+  setNumeroTomboSelecionado: (v: string) => void;
 }
 
 export default function EmprestimoModal({
@@ -33,12 +38,36 @@ export default function EmprestimoModal({
   modalEmprestimoRef,
   dropdownUsuarioEmprestimoAberto,
   setDropdownUsuarioEmprestimoAberto,
-  dropdownUsuarioEmprestimoRef
+  dropdownUsuarioEmprestimoRef,
+  numeroTomboSelecionado,
+  setNumeroTomboSelecionado
 }: EmprestimoModalProps) {
+  const [exemplaresDisponiveis, setExemplaresDisponiveis] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (modalLivro) {
+      api.get<any[]>(`/livros/${modalLivro.id_livro}/exemplares`).then(res => {
+        setExemplaresDisponiveis(Array.isArray(res.data) ? res.data.filter((ex: any) => ex.status === "disponivel") : []);
+        setNumeroTomboSelecionado("");
+      });
+    }
+  }, [modalLivro, setNumeroTomboSelecionado]);
+
   if (!modalLivro) return null;
   return (
-    <dialog ref={modalEmprestimoRef} className="rounded-lg p-0 w-full max-w-md">
-      <form method="dialog" onSubmit={handleEmprestimo} className="flex flex-col gap-4 p-6 bg-white">
+    <dialog
+      ref={modalEmprestimoRef}
+      className="rounded-lg p-0 w-full max-w-md"
+      style={{
+        position: 'fixed',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        zIndex: 50,
+        background: 'rgba(255,255,255,1)'
+      }}
+    >
+      <form method="dialog" onSubmit={e => handleEmprestimo(e, numeroTomboSelecionado)} className="flex flex-col gap-4 p-6 bg-white">
         <h2 className="text-xl font-bold mb-2 text-gray-900">Emprestar livro</h2>
         <div>
           <span className="font-semibold">Livro selecionado:</span> {modalLivro.titulo} <br />
@@ -46,47 +75,37 @@ export default function EmprestimoModal({
         </div>
         {authUser?.role === 'funcionario' ? (
           <label className="font-semibold text-gray-900">
-            Usuário:
-            <div className="relative" ref={dropdownUsuarioEmprestimoRef}>
-              <input
-                type="text"
-                className="w-full p-2 border border-gray-400 rounded mt-1"
-                placeholder="Digite o nome do usuário"
-                value={buscaUsuarioEmprestimo}
-                onChange={e => {
-                  setBuscaUsuarioEmprestimo(e.target.value);
-                  setUsuarioId("");
-                  setDropdownUsuarioEmprestimoAberto(true);
-                }}
-                onFocus={() => setDropdownUsuarioEmprestimoAberto(true)}
-                required
-              />
-              {dropdownUsuarioEmprestimoAberto && buscaUsuarioEmprestimo.length > 1 && usuariosFiltradosEmprestimo.length > 0 && (
-                <ul className="border border-gray-300 rounded bg-white mt-1 max-h-32 overflow-y-auto z-10 absolute left-0 right-0">
-                  {usuariosFiltradosEmprestimo.map(usuario => (
-                    <li
-                      key={usuario.id_usuario}
-                      className={`px-2 py-1 cursor-pointer hover:bg-blue-100 ${usuarioId === String(usuario.id_usuario) ? 'bg-blue-200' : ''}`}
-                      onMouseDown={e => e.preventDefault()}
-                      onClick={() => {
-                        setUsuarioId(String(usuario.id_usuario));
-                        setBuscaUsuarioEmprestimo(usuario.nome);
-                        setUsuariosFiltradosEmprestimo([]);
-                        setDropdownUsuarioEmprestimoAberto(false);
-                      }}
-                    >
-                      {usuario.nome} <span className="text-xs text-gray-500">({usuario.role})</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+            Matrícula do usuário:
+            <input
+              type="text"
+              className="w-full p-2 border border-gray-400 rounded mt-1"
+              placeholder="Digite a matrícula do usuário"
+              value={buscaUsuarioEmprestimo}
+              onChange={e => setBuscaUsuarioEmprestimo(e.target.value)}
+              required
+            />
           </label>
         ) : (
           <div>
             <span className="font-semibold">Usuário:</span> {authUser?.nome || authUser?.sub}
           </div>
         )}
+        <label className="font-semibold text-gray-900">
+          Exemplar disponível:
+          <select
+            className="w-full p-2 border border-gray-400 rounded mt-1"
+            value={numeroTomboSelecionado}
+            onChange={e => setNumeroTomboSelecionado(e.target.value)}
+            required
+          >
+            <option value="" disabled>Selecione o exemplar</option>
+            {exemplaresDisponiveis.map((ex: any) => (
+              <option key={ex.numero_tombo} value={ex.numero_tombo}>
+                Nº Tombo: {ex.numero_tombo} | Localização: {ex.localizacao || '-'}
+              </option>
+            ))}
+          </select>
+        </label>
         <div className="flex gap-2 justify-end">
           <button type="button" className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300" onClick={fecharModalEmprestimo}>Cancelar</button>
           <button type="submit" className="px-3 py-1 rounded bg-blue-700 text-white hover:bg-blue-800">Confirmar</button>

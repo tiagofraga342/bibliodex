@@ -62,11 +62,12 @@ export interface UsuarioRead extends UsuarioReadBasic {
 
 // --- Exemplar ---
 export interface ExemplarReadBasic {
-  id_exemplar: number;
+  numero_tombo: number;
   codigo_identificacao: string;
   status: string;
   data_aquisicao?: string | null;
   observacoes?: string | null;
+  localizacao?: string | null;
   id_livro: number;
 }
 
@@ -85,7 +86,7 @@ export interface ReservaRead {
   data_reserva: string;
   data_validade_reserva: string;
   status: string;
-  id_exemplar?: number | null;
+  numero_tombo?: number | null;
   id_livro_solicitado?: number | null;
   id_usuario: number;
   id_funcionario_registro?: number | null;
@@ -103,7 +104,7 @@ export interface EmprestimoRead {
   data_efetiva_devolucao?: string | null;
   status_emprestimo: string;
   id_usuario: number;
-  id_exemplar: number;
+  numero_tombo: number;
   id_funcionario_registro: number;
   usuario: UsuarioReadBasic;
   exemplar: ExemplarReadBasic;
@@ -325,6 +326,9 @@ export async function fetchLivros(params: {
   titulo?: string;
   autor?: string;
   categoria_id?: number;
+  isbn?: string;
+  editora?: string;
+  ano_publicacao?: number;
   sort_by?: string;
   sort_dir?: string;
 }): Promise<{ data: PaginatedLivros }> {
@@ -335,12 +339,25 @@ export async function fetchLivros(params: {
   return api.get<PaginatedLivros>("/livros", cleanParams);
 }
 
+// Função para buscar detalhes de um livro específico (com exemplares)
+export async function fetchLivroDetalhes(id_livro: string | number) {
+  return api.get(`/livros/${id_livro}`);
+}
+
 // Exemplo de função para buscar usuários por nome (autocomplete)
 export async function fetchUsuariosAutocomplete(params: {
   nome_like: string;
   limit?: number;
 }) {
   return api.get<UsuarioReadBasic[]>("/usuarios", params);
+}
+
+// Cria uma reserva para o usuário autenticado
+export async function fetchCriarReserva({ id_livro, id_usuario }: { id_livro: number, id_usuario: number }) {
+  return api.post("/reservas", {
+    id_livro_solicitado: id_livro,
+    id_usuario
+  });
 }
 
 export {
