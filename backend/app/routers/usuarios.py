@@ -57,7 +57,7 @@ def obter_usuario(
     logger.debug(f"Usuário ID {usuario_id} encontrado: {usuario.matricula}")
     return usuario
 
-@router.post("/", response_model=schemas.UsuarioRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=schemas.UsuarioRead, status_code=status.HTTP_201_CREATED)
 def criar_usuario(
     usuario: schemas.UsuarioCreate, 
     db: Session = Depends(get_db),
@@ -93,3 +93,23 @@ def excluir_usuario(
 
     logger.info(f"Usuário ID {usuario_id} excluído (ou tentativa de exclusão processada) por '{current_funcionario.matricula_funcional}'.")
     return None
+
+@router.put("/{usuario_id}", response_model=schemas.UsuarioRead)
+def atualizar_usuario(
+    usuario_id: int,
+    usuario_update: schemas.UsuarioBase,  # Usa UsuarioBase para atualização básica
+    db: Session = Depends(get_db),
+    current_funcionario: models.Funcionario = Depends(get_current_active_funcionario)
+):
+    logger.info(f"Funcionário '{current_funcionario.matricula_funcional}' tentando atualizar usuário ID: {usuario_id}")
+    db_usuario = get_usuario(db, usuario_id)
+    if not db_usuario:
+        logger.warning(f"Usuário com ID {usuario_id} não encontrado para atualização.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
+    # Atualiza os campos permitidos
+    for field, value in usuario_update.model_dump(exclude_unset=True).items():
+        setattr(db_usuario, field, value)
+    db.commit()
+    db.refresh(db_usuario)
+    logger.info(f"Usuário ID {usuario_id} atualizado com sucesso por '{current_funcionario.matricula_funcional}'.")
+    return db_usuario

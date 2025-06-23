@@ -3,17 +3,12 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-# Importe o novo roteador
 import os # Import os to access environment variables
 import logging # Import logging
 import time # For request timing
 
-
-# Adjust imports based on your project structure
-# Assuming routers are in 'app.routers' and crud, models, schemas, database are in 'app'
-from app.routers import livros, categorias, usuarios, emprestimos, reservas, auth, funcionarios
-from app.routers import devolucoes
-from app.routers import autores, exemplares # Adicione esta linha
+# Ajuste: todos os imports de routers no topo
+from app.routers import livros, categorias, usuarios, emprestimos, reservas, auth, funcionarios, devolucoes, autores, exemplares, cursos
 from app import models # To create tables if needed
 from app.database import engine # Import engine if you uncomment create_all
 
@@ -125,20 +120,17 @@ app.add_middleware(
 )
 
 # Include Routers
-# Ensure your router files (e.g., app/routers/categorias.py) are updated to use
-# db: Session = Depends(get_db) and return SQLAlchemy models
-# which will be automatically converted by Pydantic response_model.
-
 app.include_router(auth.router) 
 app.include_router(livros.router, prefix="/livros", tags=["Livros"])
 app.include_router(categorias.router, prefix="/categorias", tags=["Categorias"])
 app.include_router(usuarios.router, prefix="/usuarios", tags=["Usuários"])
 app.include_router(emprestimos.router, prefix="/emprestimos", tags=["Empréstimos"])
 app.include_router(reservas.router, prefix="/reservas", tags=["Reservas"])
-app.include_router(funcionarios.router)
+app.include_router(funcionarios.router, prefix="/funcionarios", tags=["Funcionários"])
 app.include_router(devolucoes.router)
 app.include_router(autores.router, prefix="/autores", tags=["Autores"])
 app.include_router(exemplares.router, prefix="/exemplares", tags=["Exemplares"])
+app.include_router(cursos.router, prefix="/cursos", tags=["Cursos"])
 # ... include other routers for Funcionario, Devolucao, Penalidade, Curso
 
 @app.get("/")

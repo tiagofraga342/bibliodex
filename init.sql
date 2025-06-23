@@ -22,7 +22,6 @@ CREATE TABLE IF NOT EXISTS livro (
         REFERENCES categoria(id_categoria)
         ON DELETE RESTRICT -- Ou SET NULL, dependendo da regra de negócio
 );
-CREATE INDEX IF NOT EXISTS idx_livro_id_livro ON livro(id_livro);
 COMMENT ON TABLE livro IS 'Tabela para armazenar informações sobre os livros.';
 COMMENT ON COLUMN livro.status_geral IS 'Status geral do título, ex: ativo, descatalogado';
 COMMENT ON COLUMN livro.edicao IS 'Edição do livro, ex: 1ª, 2ª, revisada';
@@ -35,7 +34,6 @@ CREATE TABLE IF NOT EXISTS autor (
     nome VARCHAR NOT NULL,
     ano_nasc INTEGER
 );
-CREATE INDEX IF NOT EXISTS idx_autor_id_autor ON autor(id_autor);
 COMMENT ON TABLE autor IS 'Tabela para armazenar informações sobre os autores.';
 
 -- Tabela de Associação: escrito_por (entre livro e autor)
@@ -77,7 +75,6 @@ CREATE TABLE IF NOT EXISTS usuario (
         REFERENCES curso(id_curso)
         ON DELETE SET NULL -- Se o curso for deletado, o usuário não é, mas perde a ref.
 );
-CREATE INDEX IF NOT EXISTS idx_usuario_matricula ON usuario(matricula);
 COMMENT ON TABLE usuario IS 'Tabela para armazenar informações dos usuários (clientes da biblioteca).';
 
 -- Tabela: funcionario
@@ -89,7 +86,6 @@ CREATE TABLE IF NOT EXISTS funcionario (
     hashed_password VARCHAR NOT NULL,
     is_active BOOLEAN DEFAULT TRUE NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_funcionario_matricula_funcional ON funcionario(matricula_funcional);
 COMMENT ON TABLE funcionario IS 'Tabela para armazenar informações dos funcionários da biblioteca.';
 
 -- Tabela: exemplar
@@ -106,7 +102,6 @@ CREATE TABLE IF NOT EXISTS exemplar (
         REFERENCES livro(id_livro)
         ON DELETE RESTRICT -- Não deletar livro se houver exemplares
 );
-CREATE INDEX IF NOT EXISTS idx_exemplar_codigo_identificacao ON exemplar(codigo_identificacao);
 COMMENT ON TABLE exemplar IS 'Tabela para armazenar os exemplares físicos dos livros.';
 COMMENT ON COLUMN exemplar.codigo_identificacao IS 'Código único do exemplar, ex: código de barras';
 COMMENT ON COLUMN exemplar.status IS 'Status: disponivel, emprestado, reservado, em_manutencao, perdido, descartado';
@@ -205,12 +200,17 @@ COMMENT ON TABLE penalidade IS 'Tabela para registrar penalidades aplicadas aos 
 COMMENT ON COLUMN penalidade.tipo_penalidade IS 'Ex: multa, suspensao';
 COMMENT ON COLUMN penalidade.status IS 'Status: ativa, paga, cumprida, cancelada';
 
--- Adicionar quaisquer outros índices que possam ser úteis para otimizar consultas frequentes
-CREATE INDEX IF NOT EXISTS idx_emprestimo_id_usuario ON emprestimo(id_usuario);
-CREATE INDEX IF NOT EXISTS idx_emprestimo_id_exemplar ON emprestimo(id_exemplar);
-CREATE INDEX IF NOT EXISTS idx_reserva_id_usuario ON reserva(id_usuario);
-CREATE INDEX IF NOT EXISTS idx_reserva_id_exemplar ON reserva(id_exemplar);
-CREATE INDEX IF NOT EXISTS idx_reserva_id_livro_solicitado ON reserva(id_livro_solicitado);
+-- Índices customizados (descomente para versão otimizada)
+-- CREATE INDEX IF NOT EXISTS idx_livro_id_livro ON livro(id_livro);
+-- CREATE INDEX IF NOT EXISTS idx_autor_id_autor ON autor(id_autor);
+-- CREATE INDEX IF NOT EXISTS idx_usuario_matricula ON usuario(matricula);
+-- CREATE INDEX IF NOT EXISTS idx_funcionario_matricula_funcional ON funcionario(matricula_funcional);
+-- CREATE INDEX IF NOT EXISTS idx_exemplar_codigo_identificacao ON exemplar(codigo_identificacao);
+-- CREATE INDEX IF NOT EXISTS idx_emprestimo_id_usuario ON emprestimo(id_usuario);
+-- CREATE INDEX IF NOT EXISTS idx_emprestimo_id_exemplar ON emprestimo(id_exemplar);
+-- CREATE INDEX IF NOT EXISTS idx_reserva_id_usuario ON reserva(id_usuario);
+-- CREATE INDEX IF NOT EXISTS idx_reserva_id_exemplar ON reserva(id_exemplar);
+-- CREATE INDEX IF NOT EXISTS idx_reserva_id_livro_solicitado ON reserva(id_livro_solicitado);
 
 -- Mensagem de conclusão
 \echo 'Schema do Bibliodex criado/verificado com sucesso.'

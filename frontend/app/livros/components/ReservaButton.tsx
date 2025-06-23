@@ -19,8 +19,8 @@ export default function ReservaButton({ livro, statusLivro, abrirModalReserva }:
     : false;
 
   if (!isAuthenticated) return null;
-  if (desabilitado) return (
-    <button className="px-3 py-1 bg-yellow-300 text-gray-700 rounded w-fit cursor-not-allowed opacity-60" disabled>
+  if (desabilitado || todosReservados) return (
+    <button className="px-3 py-1 bg-gray-300 text-gray-700 rounded w-fit cursor-not-allowed opacity-60" disabled>
       Reservar
     </button>
   );

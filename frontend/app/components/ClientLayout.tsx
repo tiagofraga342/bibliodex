@@ -33,11 +33,8 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
             </Link>
           </div>
           <nav className="flex flex-wrap gap-2 sm:gap-3 mt-2 sm:mt-0">
-            <Link href="/" className="px-3 py-1.5 bg-blue-900/80 hover:bg-blue-900 text-white rounded transition text-sm font-semibold">Home</Link>
-            
             {isAuthenticated && user?.role === 'usuario_cliente' && (
               <>
-                <Link href="/livros" className="px-3 py-1.5 bg-blue-900/80 hover:bg-blue-900 text-white rounded transition text-sm font-semibold">Livros</Link>
                 <Link href="/reservas/me" className="px-3 py-1.5 bg-blue-900/80 hover:bg-blue-900 text-white rounded transition text-sm font-semibold">Minhas Reservas</Link>
                 <Link href="/emprestimos/me" className="px-3 py-1.5 bg-blue-900/80 hover:bg-blue-900 text-white rounded transition text-sm font-semibold">Meus Empréstimos</Link>
                 {/* <Link href="/usuarios/me" className="px-3 py-1.5 bg-blue-900/80 hover:bg-blue-900 text-white rounded transition text-sm font-semibold">Meu Perfil</Link> */}
@@ -46,12 +43,10 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
 
             {isAuthenticated && user?.role === 'funcionario' && (
               <>
-                <Link href="/livros" className="px-3 py-1.5 bg-blue-900/80 hover:bg-blue-900 text-white rounded transition text-sm font-semibold">Livros</Link>
                 <Link href="/usuarios" className="px-3 py-1.5 bg-blue-900/80 hover:bg-blue-900 text-white rounded transition text-sm font-semibold">Usuários</Link>
                 <Link href="/funcionarios" className="px-3 py-1.5 bg-blue-900/80 hover:bg-blue-900 text-white rounded transition text-sm font-semibold">Funcionários</Link>
                 <Link href="/emprestimos" className="px-3 py-1.5 bg-blue-900/80 hover:bg-blue-900 text-white rounded transition text-sm font-semibold">Empréstimos</Link>
                 <Link href="/reservas" className="px-3 py-1.5 bg-blue-900/80 hover:bg-blue-900 text-white rounded transition text-sm font-semibold">Reservas</Link>
-                <Link href="/devolucoes" className="px-3 py-1.5 bg-blue-900/80 hover:bg-blue-900 text-white rounded transition text-sm font-semibold">Devoluções</Link>
                 <Link href="/relatorios" className="px-3 py-1.5 bg-blue-900/80 hover:bg-blue-900 text-white rounded transition text-sm font-semibold">Relatórios</Link>
                 <Link href="/admin" className="px-3 py-1.5 bg-blue-900/80 hover:bg-blue-900 text-white rounded transition text-sm font-semibold">Administração</Link>
               </>

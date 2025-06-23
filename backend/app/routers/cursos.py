@@ -6,6 +6,6 @@ from typing import List
 
 router = APIRouter()  # Sem prefixo, sem tags
 
-@router.get("", response_model=List[schemas.AutorReadBasic])
-def listar_autores(db: Session = Depends(get_db)):
-    return crud.get_autores(db)
+@router.get("", response_model=List[schemas.CursoReadBasic])
+def listar_cursos(db: Session = Depends(get_db)):
+    return crud.get_cursos(db)

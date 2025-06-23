@@ -62,3 +62,27 @@ def excluir_categoria(
         raise HTTPException(status_code=404, detail="Categoria não encontrada para exclusão (ou erro interno no CRUD).")
     logger.info(f"Categoria ID {categoria_id} excluída com sucesso por '{current_funcionario.matricula_funcional}'.")
     return None # Return None for 204 No Content
+
+@router.put("/{categoria_id}", response_model=schemas.CategoriaRead)
+def atualizar_categoria(
+    categoria_id: int,
+    categoria_update: schemas.CategoriaCreate,
+    db: Session = Depends(get_db),
+    current_funcionario: models.Funcionario = Depends(get_current_active_funcionario)
+):
+    logger.info(f"Funcionário '{current_funcionario.matricula_funcional}' tentando atualizar categoria ID: {categoria_id}")
+    cat = crud.get_categoria(db, categoria_id)
+    if not cat:
+        logger.warning(f"Categoria com ID {categoria_id} não encontrada para atualização.")
+        raise HTTPException(status_code=404, detail="Categoria não encontrada")
+    try:
+        for field, value in categoria_update.model_dump(exclude_unset=True).items():
+            setattr(cat, field, value)
+        db.commit()
+        db.refresh(cat)
+        logger.info(f"Categoria ID {categoria_id} atualizada com sucesso por '{current_funcionario.matricula_funcional}'.")
+        return cat
+    except Exception as e:
+        db.rollback()
+        logger.exception(f"Erro ao atualizar categoria ID {categoria_id}: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao atualizar categoria. Verifique se os dados são válidos e não violam restrições do banco.")

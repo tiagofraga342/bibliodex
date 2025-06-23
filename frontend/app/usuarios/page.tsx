@@ -74,12 +74,15 @@ function UsuariosPage() {
 
   async function excluirUsuario(id: number) {
     if (!window.confirm("Excluir usuário?")) return;
+    setMensagem(null);
     try {
       await api.delete(`/usuarios/${id}`);
       setMensagem("Usuário excluído!");
-      await fetchUsuarios();
+      setUsuarios(prev => prev.filter(u => u.id_usuario !== id));
     } catch (e: any) {
-      setMensagem(e?.data?.detail || "Erro ao excluir usuário.");
+      // Tenta forçar atualização da lista mesmo em erro
+      await fetchUsuarios();
+      setMensagem(e?.message || e?.data?.detail || "Erro ao excluir usuário.");
     }
   }
 

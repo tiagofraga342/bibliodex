@@ -154,7 +154,7 @@ const clearTokens = () => {
 // --- Função para tentar renovar o access_token automaticamente ---
 const tryRefreshToken = async (): Promise<boolean> => {
   const refreshToken = getRefreshToken();
-  if (!refreshToken) return false;
+  if (!refreshToken || refreshToken === "undefined") return false;
   try {
     const response = await fetch(`${API_BASE_URL}/auth/refresh_token`, {
       method: "POST",
@@ -298,7 +298,7 @@ const api = {
     return { data };
   },
 
-  delete: async <T>(url: string): Promise<{ data: T }> => {
+  delete: async <T>(url: string): Promise<{ data?: T }> => {
     const token = getAuthToken();
     const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
     const headers: Record<string, string> = {};
@@ -309,6 +309,10 @@ const api = {
     });
     if (!response.ok) {
       await handleApiError(response, fullUrl);
+    }
+    // Se for 204 No Content, não tente fazer response.json()
+    if (response.status === 204) {
+      return {};
     }
     const data = await response.json();
     return { data };
@@ -356,6 +360,11 @@ export async function fetchUsuariosAutocomplete(params: {
 // Cria uma reserva para o usuário autenticado
 export async function fetchCriarReserva(payload: any) {
   return api.post("/reservas", payload);
+}
+
+// Função para buscar funcionários
+export async function fetchFuncionarios() {
+  return api.get<FuncionarioReadBasic[]>("/funcionarios");
 }
 
 export {

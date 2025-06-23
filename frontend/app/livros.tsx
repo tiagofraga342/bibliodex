@@ -174,7 +174,19 @@ export default function Livros() {
       alert("Você precisa estar logado para reservar livros.");
       return;
     }
-    // Buscar exemplares do livro
+    // Abra o modal imediatamente
+    setModalReservaLivro({
+      ...livro,
+      exemplaresDisponiveis: [],
+      numeroTomboSelecionado: "",
+      setNumeroTomboSelecionado: setNumeroTomboSelecionado
+    });
+    setUsuarioId(authUser?.role === 'usuario_cliente' ? String(authUser.user_id) : "");
+    setBuscaUsuarioReserva(authUser?.role === 'usuario_cliente' ? authUser.nome || "" : "");
+    setMensagemReserva("");
+    setTimeout(() => modalReservaRef.current?.showModal(), 0);
+
+    // Buscar exemplares do livro (atualiza depois)
     let exemplaresDisponiveis: any[] = [];
     try {
       const res = await api.get(`/livros/${livro.id_livro}/exemplares`);
@@ -182,16 +194,10 @@ export default function Livros() {
     } catch (e) {
       exemplaresDisponiveis = [];
     }
-    setModalReservaLivro({
-      ...livro,
-      exemplaresDisponiveis,
-      numeroTomboSelecionado: "",
-      setNumeroTomboSelecionado: setNumeroTomboSelecionado
-    });
-    setUsuarioId(authUser?.role === 'usuario_cliente' ? String(authUser.user_id) : ""); // Pre-fill for cliente
-    setBuscaUsuarioReserva(authUser?.role === 'usuario_cliente' ? authUser.nome || "" : "");
-    setMensagemReserva("");
-    setTimeout(() => modalReservaRef.current?.showModal(), 0);
+    setModalReservaLivro(prev => prev ? {
+      ...prev,
+      exemplaresDisponiveis
+    } : null);
   }
 
   function fecharModalReserva() {

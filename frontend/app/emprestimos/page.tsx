@@ -11,7 +11,8 @@ function EmprestimosPage() {
   const [filtroLivro, setFiltroLivro] = useState(""); // ID do livro
   const [filtroAutor, setFiltroAutor] = useState(""); // Nome do autor
   const [filtroCategoria, setFiltroCategoria] = useState(""); // Nome da categoria
-  const [filtroStatus, setFiltroStatus] = useState("");
+  const [filtroStatus, setFiltroStatus] = useState("ativo"); // status padrão: ativo
+  const [ordem, setOrdem] = useState<{ campo: string; direcao: "asc" | "desc" }>({ campo: "data_prevista_devolucao", direcao: "asc" });
   const [emprestimos, setEmprestimos] = useState<EmprestimoRead[]>([]);
   const [modalDetalhes, setModalDetalhes] = useState<EmprestimoRead | null>(null);
 
@@ -172,6 +173,26 @@ function EmprestimosPage() {
     }
     fetchData();
   }, [user]);
+
+  // Filtro padrão: status ativo e ordenação por data de devolução crescente
+  // const [filtroStatus, setFiltroStatus] = useState("ativo"); // status padrão: ativo // REMOVIDO DUPLICADO
+
+  // Adapte a busca para usar filtroStatus e ordem
+  useEffect(() => {
+    async function fetchEmprestimos() {
+      try {
+        const params: any = {};
+        if (filtroStatus) params.status_emprestimo = filtroStatus;
+        if (ordem.campo) params.sort_by = ordem.campo;
+        if (ordem.direcao) params.sort_dir = ordem.direcao;
+        const res = await api.get<EmprestimoRead[]>("/emprestimos", params);
+        setEmprestimos(res.data);
+      } catch (e) {
+        setEmprestimos([]);
+      }
+    }
+    fetchEmprestimos();
+  }, [filtroStatus, ordem]);
 
   function statusEmprestimoLabel(status: string) {
     switch (status) {

@@ -7,3 +7,4 @@ from .crud_exemplar import *
 from .crud_emprestimo import *
 from .crud_reserva import *
 from .crud_devolucao import *
+from .crud_curso import *

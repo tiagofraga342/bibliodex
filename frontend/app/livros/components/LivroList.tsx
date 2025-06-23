@@ -114,7 +114,7 @@ export default function LivroList({ livros, isAuthenticated, abrirModalEmprestim
               {user?.role === "funcionario" && (
                 <button
                   className={
-                    (livro.status_geral === "descatalogado" ||
+                    (String(livro.status_geral).trim().toLowerCase() === "descatalogado" ||
                       !Array.isArray(livro.exemplares) ||
                       !livro.exemplares.some((ex: any) => ex.status === "disponivel"))
                       ? "px-3 py-1 bg-blue-300 text-gray-700 rounded w-fit cursor-not-allowed opacity-60"

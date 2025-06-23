@@ -36,11 +36,11 @@ def main():
         print("Tabelas de usuário ou funcionário estão vazias.")
         return
 
-    # Busca o menor e maior id_livro — evita trazer todos
-    cur.execute("SELECT MIN(id_livro), MAX(id_livro) FROM livro;")
-    min_lid, max_lid = cur.fetchone()
-    if min_lid is None or max_lid is None:
-        print("Tabela 'livro' vazia.")
+    # Busca todos os exemplares disponíveis
+    cur.execute("SELECT numero_tombo FROM exemplar;")
+    exemplares = [r[0] for r in cur.fetchall()]
+    if not exemplares:
+        print("Tabela 'exemplar' vazia.")
         return
 
     today = date.today()
@@ -52,32 +52,35 @@ def main():
         for _ in range(offset, upper):
             data_retirada = random_date(START_DATE, today - timedelta(days=1))
 
-            # Define data_devolucao (75% devolvido, 25% pendente)
+            # Define data_prevista_devolucao (prazo aleatório entre 7 e MAX_LOAN_DAYS dias)
+            prazo = random.randint(7, MAX_LOAN_DAYS)
+            data_prevista_devolucao = data_retirada + timedelta(days=prazo)
+
+            # Define data_efetiva_devolucao (75% devolvido, 25% pendente)
             if random.random() < 0.75:
-                days = random.randint(1, MAX_LOAN_DAYS)
-                data_devolucao = data_retirada + timedelta(days=days)
-                if data_devolucao > today:
-                    data_devolucao = today
+                days = random.randint(1, prazo)
+                data_efetiva_devolucao = data_retirada + timedelta(days=days)
+                if data_efetiva_devolucao > today:
+                    data_efetiva_devolucao = today
             else:
-                data_devolucao = None
+                data_efetiva_devolucao = None
 
             usuario_id     = random.choice(usuarios)
-            # Gera id_livro aleatório no intervalo [min_lid, max_lid]
-            livro_id       = random.randint(min_lid, max_lid)
+            numero_tombo   = random.choice(exemplares)
             funcionario_id = random.choice(funcionarios)
 
-            batch.append((data_retirada, data_devolucao,
-                          usuario_id, livro_id, funcionario_id))
+            batch.append((data_retirada, data_prevista_devolucao, data_efetiva_devolucao,
+                          usuario_id, numero_tombo, funcionario_id))
 
         execute_values(
             cur,
             """
             INSERT INTO emprestimo
-              (data_retirada, data_devolucao, id_usuario, id_livro, id_funcionario)
+              (data_retirada, data_prevista_devolucao, data_efetiva_devolucao, id_usuario, numero_tombo, id_funcionario_registro)
             VALUES %s
             """,
             batch,
-            template="(%s, %s, %s, %s, %s)"
+            template="(%s, %s, %s, %s, %s, %s)"
         )
         conn.commit()
         total_inserted = upper

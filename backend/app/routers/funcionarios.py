@@ -7,14 +7,14 @@ from app.database import get_db
 from app import crud, schemas, models
 from app.routers.auth import get_current_active_funcionario
 
+# Remover prefix do APIRouter, pois já é adicionado no main.py
 router = APIRouter(
-    prefix="/funcionarios",
     tags=["Funcionários"],
     dependencies=[Depends(get_current_active_funcionario)] # Protege todas as rotas neste router
 )
 logger = logging.getLogger(__name__) # Logger para este módulo
 
-@router.post("/", response_model=schemas.FuncionarioRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=schemas.FuncionarioRead, status_code=status.HTTP_201_CREATED)
 def criar_funcionario(
     funcionario: schemas.FuncionarioCreate,
     db: Session = Depends(get_db),
@@ -37,7 +37,7 @@ def criar_funcionario(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Erro interno ao criar funcionário.")
 
 
-@router.get("/", response_model=List[schemas.FuncionarioRead])
+@router.get("", response_model=List[schemas.FuncionarioRead])
 def listar_funcionarios(
     db: Session = Depends(get_db),
     skip: int = 0,
