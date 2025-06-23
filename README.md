@@ -71,6 +71,35 @@ Durante o desenvolvimento, utilizamos **IA Generativa** em diversas etapas:
 
 ---
 
+## 🗃️ Ordem Recomendada para População do Banco de Dados
+
+Após subir o banco e o backend, execute os scripts de população na seguinte ordem para garantir integridade referencial:
+
+1. **Usuários**
+   ```bash
+   docker compose exec backend python scripts/populate_usuario.py
+   ```
+2. **Funcionários**
+   ```bash
+   docker compose exec backend python scripts/populate_funcionario.py
+   ```
+3. **Livros**
+   ```bash
+   docker compose exec backend python scripts/populate_livro.py
+   ```
+4. **Exemplares**
+   ```bash
+   docker compose exec backend python scripts/populate_exemplar.py
+   ```
+5. **Empréstimos**
+   ```bash
+   docker compose exec backend python scripts/populate_emprestimo.py
+   ```
+
+> Execute cada script apenas após o anterior finalizar. Isso garante que todas as chaves estrangeiras estejam presentes e evita erros de integridade.
+
+---
+
 ### Créditos
 - Tiago Lima Fraga
 - Giovana Couto
