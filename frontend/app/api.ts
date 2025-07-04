@@ -177,10 +177,9 @@ const tryRefreshToken = async (): Promise<boolean> => {
 async function fetchWithAutoRefresh(input: RequestInfo, init?: RequestInit, retry = true): Promise<Response> {
   let response = await fetch(input, init);
   if (response.status === 401 && retry) {
-    // Tenta renovar o token
+    console.warn('[auth] 401 recebido, tentando refresh token...');
     const refreshed = await tryRefreshToken();
     if (refreshed) {
-      // Reenvia a requisição original com novo token
       const token = getAuthToken();
       if (token) {
         const headers = new Headers(init?.headers || {});
@@ -190,6 +189,11 @@ async function fetchWithAutoRefresh(input: RequestInfo, init?: RequestInit, retr
       }
     }
     // Se não conseguiu renovar, limpa tokens e redireciona para login
+    console.warn('[auth] Falha ao renovar token. Limpando tokens e redirecionando para login.');
+    console.warn('[auth] localStorage:', {
+      access_token: localStorage.getItem('bibliodex_access_token'),
+      refresh_token: localStorage.getItem('bibliodex_refresh_token')
+    });
     clearTokens();
     if (typeof window !== "undefined" && !window.location.pathname.endsWith('/login')) {
       window.location.href = '/login';

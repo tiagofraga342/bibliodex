@@ -47,7 +47,7 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
                 <Link href="/funcionarios" className="px-3 py-1.5 bg-blue-900/80 hover:bg-blue-900 text-white rounded transition text-sm font-semibold">Funcionários</Link>
                 <Link href="/emprestimos" className="px-3 py-1.5 bg-blue-900/80 hover:bg-blue-900 text-white rounded transition text-sm font-semibold">Empréstimos</Link>
                 <Link href="/reservas" className="px-3 py-1.5 bg-blue-900/80 hover:bg-blue-900 text-white rounded transition text-sm font-semibold">Reservas</Link>
-                <Link href="/relatorios" className="px-3 py-1.5 bg-blue-900/80 hover:bg-blue-900 text-white rounded transition text-sm font-semibold">Relatórios</Link>
+                {/* <Link href="/relatorios" className="px-3 py-1.5 bg-blue-900/80 hover:bg-blue-900 text-white rounded transition text-sm font-semibold">Relatórios</Link> */}
                 <Link href="/admin" className="px-3 py-1.5 bg-blue-900/80 hover:bg-blue-900 text-white rounded transition text-sm font-semibold">Administração</Link>
               </>
             )}

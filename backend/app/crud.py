@@ -1,12 +1,8 @@
-# OBSOLETO: O CRUD foi dividido em arquivos menores no diretório 'crud/'.
-# Utilize os módulos em backend/app/crud/ para manutenção e importação.
-
 from sqlalchemy.orm import Session, joinedload, selectinload
 from typing import List, Optional
 from fastapi import HTTPException, status # Import HTTPException
 from . import models, schemas, security # Use . para importações relativas dentro do mesmo pacote
 import logging
-import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +135,7 @@ def get_categoria(db: Session, categoria_id: int) -> Optional[models.Categoria]:
 def get_categorias(db: Session, skip: int = 0, limit: int = 100) -> List[models.Categoria]:
     logger.debug(f"Buscando categorias com skip: {skip}, limit: {limit}")
     return db.query(models.Categoria).options(
-        #selectinload(models.Categoria.livros)
+        selectinload(models.Categoria.livros)
     ).offset(skip).limit(limit).all()
 
 def create_categoria(db: Session, categoria: schemas.CategoriaCreate) -> models.Categoria:
@@ -378,15 +374,15 @@ def delete_funcionario(db: Session, funcionario_id: int) -> Optional[models.Func
 
 
 # --- Exemplar CRUD (Existente) ---
-def get_exemplar(db: Session, numero_tombo: int) -> Optional[models.Exemplar]:
-    logger.debug(f"Buscando exemplar com numero_tombo: {numero_tombo}")
+def get_exemplar(db: Session, exemplar_id: int) -> Optional[models.Exemplar]:
+    logger.debug(f"Buscando exemplar com id: {exemplar_id}")
     exemplar = db.query(models.Exemplar).options(
         joinedload(models.Exemplar.livro).joinedload(models.Livro.categoria),
         joinedload(models.Exemplar.livro).selectinload(models.Livro.autores)
-    ).filter(models.Exemplar.numero_tombo == numero_tombo).first()
+    ).filter(models.Exemplar.id_exemplar == exemplar_id).first()
 
     if not exemplar:
-        logger.warning(f"Exemplar com numero_tombo {numero_tombo} não encontrado.")
+        logger.warning(f"Exemplar com id {exemplar_id} não encontrado.")
     return exemplar
 
 def get_exemplares_por_livro(db: Session, livro_id: int, skip: int = 0, limit: int = 100) -> List[models.Exemplar]:
@@ -409,8 +405,11 @@ def create_exemplar(db: Session, exemplar: schemas.ExemplarCreate) -> models.Exe
     if not db_livro:
         logger.error(f"Livro com id {exemplar.id_livro} não encontrado ao tentar criar exemplar {exemplar.codigo_identificacao}.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Livro com id {exemplar.id_livro} não encontrado.")
-    # Impede criar exemplar disponível para livro descatalogado
-    if db_livro.status_geral == "descatalogado" and exemplar.status == "disponivel":
+    
+    # Check if codigo_identificacao is unique
+    db_exemplar_check = db.query(models.Exemplar).filter(models.Exemplar.codigo_identificacao == exemplar.codigo_identificacao).first()
+    if db_exemplar_check:
+        logger.warning(f"Exemplar com có    if db_livro.status_geral == "descatalogado" and exemplar.status == "disponivel":
         logger.warning(f"Tentativa de criar exemplar disponível para livro descatalogado (ID: {exemplar.id_livro}).")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Não é permitido criar exemplar disponível para livro descatalogado.")
     # Se livro descatalogado, força status para 'descartado'
@@ -1070,32 +1069,3 @@ def get_livros_paginados(
     for livro in items:
         total_exemplares = len(livro.exemplares)
         exemplares_disponiveis = sum(1 for ex in livro.exemplares if ex.status == "disponivel")
-        livro_dict = schemas.LivroRead.model_validate(livro).model_dump()
-        livro_dict["total_exemplares"] = total_exemplares
-        livro_dict["exemplares_disponiveis"] = exemplares_disponiveis
-        livros_result.append(livro_dict)
-    return {"total": total, "items": livros_result}
-
-def update_livro(db: Session, livro_id: int, livro_update: schemas.LivroUpdate) -> Optional[models.Livro]:
-    db_livro = db.query(models.Livro).options(selectinload(models.Livro.exemplares)).filter(models.Livro.id_livro == livro_id).first()
-    if not db_livro:
-        logger.warning(f"Livro com id {livro_id} não encontrado para atualização.")
-        return None
-    status_antes = db_livro.status_geral
-    for key, value in livro_update.model_dump(exclude_unset=True).items():
-        if key == "ids_autores" and value is not None:
-            autores = db.query(models.Autor).filter(models.Autor.id_autor.in_(value)).all()
-            db_livro.autores = autores
-        else:
-            setattr(db_livro, key, value)
-    db.commit()
-    db.refresh(db_livro)
-    # Se mudou para descatalogado, atualizar exemplares para 'descartado'
-    if status_antes != "descatalogado" and db_livro.status_geral == "descatalogado":
-        for ex in db_livro.exemplares:
-            if ex.status == "disponivel":
-                ex.status = "descartado"
-        db.commit()
-        logger.info(f"Todos exemplares disponíveis do livro ID {livro_id} foram marcados como 'descartado' por descatalogação.")
-    return db_livro
-
