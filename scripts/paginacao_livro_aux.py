@@ -16,11 +16,13 @@ DATABASE_URL = os.getenv(
 conn = psycopg2.connect(DATABASE_URL)
 cur = conn.cursor()
 
-pagina = 1000000  # Altere para a página desejada
+pagina = 1250000  # Altere para a página desejada
 tam_pagina = 20
 
 def tempo_paginacao_padrao(cur, pagina, tam_pagina):
     offset = (pagina - 1) * tam_pagina
+    print(f"\nDropando índice do título...")
+    cur.execute("DROP INDEX IF EXISTS idx_livro_titulo;")
     print(f"\nTempo da busca paginada padrão (OFFSET) para página {pagina}:")
     start = time.time()
     cur.execute(
@@ -34,6 +36,8 @@ def tempo_paginacao_padrao(cur, pagina, tam_pagina):
     _ = cur.fetchall()
     elapsed = time.time() - start
     print(f"Tempo: {elapsed:.4f} segundos")
+    print(f"\nCriando índice do título novamente...")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_livro_titulo ON livro (titulo);")
     return elapsed
 
 def tempo_paginacao_otimizada(cur, pagina, tam_pagina):

@@ -61,12 +61,12 @@ Durante o desenvolvimento, utilizamos **IA Generativa** em diversas etapas:
 4.  **Suba os contêineres com Docker Compose:**
     Na raiz do projeto (`bibliodex/`), execute:
     ```bash
-    docker-compose up --build
+    docker compose up --build
     ```
     *   O `--build` é recomendado na primeira vez ou após alterações nos Dockerfiles.
 
 5.  **Acesso às Aplicações:**
-    *   **Frontend:** [http://localhost:3001](http://localhost:3001)
+    *   **Frontend:** [http://localhost:3000](http://localhost:3000)
     *   **Backend API (Swagger UI):** [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ---
@@ -98,10 +98,43 @@ Após subir o banco e o backend, execute os scripts de população na seguinte o
 
 > Execute cada script apenas após o anterior finalizar. Isso garante que todas as chaves estrangeiras estejam presentes e evita erros de integridade.
 
----
+## ⚡ Otimizações de Performance e Benchmark
 
+O projeto inclui scripts e práticas para otimizar buscas e paginação no banco de dados, com medições de performance:
+
+- **Paginação otimizada (keyset):** Utiliza uma tabela auxiliar para obter o primeiro título de cada página, permitindo saltos rápidos mesmo em bases grandes. O script `scripts/paginacao_livro_aux.py` compara o tempo da paginação padrão (OFFSET/LIMIT) com a otimizada, dropando e recriando índices para medir o impacto real.
+    - Exemplo de speedup observado: mais de 26.000x mais rápido na última medição.
+- **Índices para busca:** O script `scripts/otimiza_bd.py` mede o tempo de busca por título e editora antes e depois da criação dos índices, mostrando a diferença de performance.
+- **Benchmarks automáticos:** Os scripts exibem o tempo de execução de cada abordagem e calculam a taxa de melhoria (speedup) para facilitar a análise.
+
+Veja os scripts em `scripts/paginacao_livro_aux.py` e `scripts/otimiza_bd.py` para exemplos práticos e comandos SQL utilizados.
+
+
+## 👤 Como acessar como Funcionário ou Usuário
+
+Após popular o banco, você pode acessar o sistema como funcionário ou usuário comum para testar permissões e funcionalidades:
+
+- **Login de Funcionário:**
+    - Acesse `/login` no frontend.
+    - Use a matrícula funcional e senha de um funcionário cadastrado pelo script `scripts/populate_funcionario.py`.
+    - Funcionários têm acesso à área administrativa e podem gerenciar livros, usuários, empréstimos etc.
+    - Exemplo padrão (veja/copie do script):
+        - Matrícula funcional: `FUNC000001`
+        - Senha: `teste123`
+
+- **Login de Usuário:**
+    - Acesse `/login` no frontend.
+    - Use a matrícula e senha de um usuário cadastrado pelo script `scripts/populate_usuario.py`.
+    - Usuários podem consultar livros, reservar, emprestar e ver seu histórico.
+    - Exemplo padrão (veja/copie do script):
+        - Matrícula: `10000000`
+        - Senha: `teste123`
+
+> As matrículas e senhas padrão podem ser alteradas nos scripts de população. Consulte os arquivos para mais exemplos ou para criar novos acessos.
+
+----
 ### Créditos
 - Tiago Lima Fraga
-- Giovana Couto
+- Giovanna Couto
 - Luan Pinheiro
-- Andre Palacio
+- André Palacio
